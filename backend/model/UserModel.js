@@ -19,7 +19,15 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: new Date(),
   },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: String,
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
 });
+
 
 userSchema.pre("save", async function () {
   this.password = await bcrypt.hash(this.password, 12);

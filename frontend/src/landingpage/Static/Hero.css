@@ -1,0 +1,49 @@
+.hero-section {
+  background: linear-gradient(135deg, #f0f8ff, #e6f2ff);
+  padding: 60px 20px;
+  min-height: 80vh;
+}
+
+.hero-img {
+  max-width: 1200px;
+  animation: fadeIn 1.2s ease-in-out;
+}
+
+.highlight {
+  color: #007bff;
+}
+
+.hero-btn {
+  padding: 12px 30px;
+  font-size: 18px;
+  border-radius: 30px;
+  transition: all 0.3s ease;
+}
+
+.hero-btn:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.5s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 1.5s ease forwards;
+}
+
+.animate-scale {
+  animation: fadeIn 1.5s ease forwards;
+}

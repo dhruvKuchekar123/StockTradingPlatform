@@ -11,6 +11,9 @@ import Positions from "./Positions";
 import Summary from "./Summary";
 import WatchList from "./WatchList";
 import { GeneralContextProvider } from "./GeneralContext";
+import Analytics from "./Analytics";
+import Profile from "./Profile";
+
 
 const Dashboard = () => {
   return (
@@ -25,11 +28,14 @@ const Dashboard = () => {
           <Route path="/holdings" element={<Holdings />} />
           <Route path="/positions" element={<Positions />} />
           <Route path="/funds" element={<Funds />} />
-          <Route path="/apps" element={<Apps />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </div>
     </div>
   );
 };
+
+
 
 export default Dashboard;

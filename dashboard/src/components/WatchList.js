@@ -1,177 +1,122 @@
 import React, { useState, useContext } from "react";
-
-import axios from "axios";
-
 import GeneralContext from "./GeneralContext";
-
-import { Tooltip, Grow } from "@mui/material";
-
-import {
-  BarChartOutlined,
-  KeyboardArrowDown,
-  KeyboardArrowUp,
-  MoreHoriz,
-} from "@mui/icons-material";
-
 import { watchlist } from "../data/data";
-import { DoughnutChart } from "./DoughnoutChart";
-
-const labels = watchlist.map((subArray) => subArray["name"]);
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Search, 
+  BarChart3, 
+  MoreHorizontal,
+  ChevronUp,
+  ChevronDown,
+  Info
+} from "lucide-react";
+import { Tooltip } from "@mui/material";
 
 const WatchList = () => {
-  const data = {
-    labels,
-    datasets: [
-      {
-        label: "Price",
-        data: watchlist.map((stock) => stock.price),
-        backgroundColor: [
-          "rgba(255, 99, 132, 0.5)",
-          "rgba(54, 162, 235, 0.5)",
-          "rgba(255, 206, 86, 0.5)",
-          "rgba(75, 192, 192, 0.5)",
-          "rgba(153, 102, 255, 0.5)",
-          "rgba(255, 159, 64, 0.5)",
-        ],
-        borderColor: [
-          "rgba(255, 99, 132, 1)",
-          "rgba(54, 162, 235, 1)",
-          "rgba(255, 206, 86, 1)",
-          "rgba(75, 192, 192, 1)",
-          "rgba(153, 102, 255, 1)",
-          "rgba(255, 159, 64, 1)",
-        ],
-        borderWidth: 1,
-      },
-    ],
-  };
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // export const data = {
-  //   labels: ["Red", "Blue", "Yellow", "Green", "Purple", "Orange"],
-  // datasets: [
-  //   {
-  //     label: "# of Votes",
-  //     data: [12, 19, 3, 5, 2, 3],
-  //     backgroundColor: [
-  //       "rgba(255, 99, 132, 0.2)",
-  //       "rgba(54, 162, 235, 0.2)",
-  //       "rgba(255, 206, 86, 0.2)",
-  //       "rgba(75, 192, 192, 0.2)",
-  //       "rgba(153, 102, 255, 0.2)",
-  //       "rgba(255, 159, 64, 0.2)",
-  //     ],
-  //     borderColor: [
-  //       "rgba(255, 99, 132, 1)",
-  //       "rgba(54, 162, 235, 1)",
-  //       "rgba(255, 206, 86, 1)",
-  //       "rgba(75, 192, 192, 1)",
-  //       "rgba(153, 102, 255, 1)",
-  //       "rgba(255, 159, 64, 1)",
-  //     ],
-  //     borderWidth: 1,
-  //   },
-  // ],
-  // };
+  const filteredList = watchlist.filter(stock => 
+    stock.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="watchlist-container">
       <div className="search-container">
-        <input
-          type="text"
-          name="search"
-          id="search"
-          placeholder="Search eg:infy, bse, nifty fut weekly, gold mcx"
-          className="search"
-        />
-        <span className="counts"> {watchlist.length} / 50</span>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dim" size={16} />
+          <input
+            type="text"
+            placeholder="Search symbols..."
+            className="search-input pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
-      <ul className="list">
-        {watchlist.map((stock, index) => {
-          return <WatchListItem stock={stock} key={index} />;
-        })}
+      <ul className="stock-list">
+        {filteredList.map((stock, index) => (
+          <WatchListItem stock={stock} key={index} />
+        ))}
       </ul>
+    </div>
+  );
+};
 
-      <DoughnutChart data={data} />
+const WatchListItem = ({ stock }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <li 
+      className="stock-item" 
+      onMouseEnter={() => setIsHovered(true)} 
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${stock.isDown ? 'bg-red-500/10' : 'bg-emerald-500/10'}`}>
+          {stock.isDown ? (
+            <TrendingDown size={18} className="text-danger" />
+          ) : (
+            <TrendingUp size={18} className="text-success" />
+          )}
+        </div>
+        <div>
+          <p className="stock-symbol">{stock.name}</p>
+          <p className="stock-company">{stock.name} Ltd.</p>
+        </div>
+      </div>
+
+      <div className="text-right">
+        {isHovered ? (
+          <WatchListActions symbol={stock.name} />
+        ) : (
+          <>
+            <p className="stock-price">₹{stock.price}</p>
+            <p className={`text-xs ${stock.isDown ? 'text-danger' : 'text-success'}`}>
+              {stock.percent}
+            </p>
+          </>
+        )}
+      </div>
+    </li>
+  );
+};
+
+const WatchListActions = ({ symbol }) => {
+  const generalContext = useContext(GeneralContext);
+
+  return (
+    <div className="flex gap-2 animate-in fade-in zoom-in duration-200">
+      <Tooltip title="Buy">
+        <button 
+          className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white border-none cursor-pointer"
+          onClick={() => generalContext.openOrderWindow(symbol, "BUY")}
+        >
+          <ChevronUp size={16} />
+        </button>
+      </Tooltip>
+      <Tooltip title="Sell">
+        <button 
+          className="p-1.5 bg-red-600 hover:bg-red-500 rounded text-white border-none cursor-pointer"
+          onClick={() => generalContext.openOrderWindow(symbol, "SELL")}
+        >
+          <ChevronDown size={16} />
+        </button>
+      </Tooltip>
+
+      <Tooltip title="Chart">
+        <button className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300">
+          <BarChart3 size={16} />
+        </button>
+      </Tooltip>
+      <Tooltip title="Details">
+        <button className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300">
+          <MoreHorizontal size={16} />
+        </button>
+      </Tooltip>
     </div>
   );
 };
 
 export default WatchList;
-
-const WatchListItem = ({ stock }) => {
-  const [showWatchlistActions, setShowWatchlistActions] = useState(false);
-
-  const handleMouseEnter = (e) => {
-    setShowWatchlistActions(true);
-  };
-
-  const handleMouseLeave = (e) => {
-    setShowWatchlistActions(false);
-  };
-
-  return (
-    <li onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-      <div className="item">
-        <p className={stock.isDown ? "down" : "up"}>{stock.name}</p>
-        <div className="itemInfo">
-          <span className="percent">{stock.percent}</span>
-          {stock.isDown ? (
-            <KeyboardArrowDown className="down" />
-          ) : (
-            <KeyboardArrowUp className="down" />
-          )}
-          <span className="price">{stock.price}</span>
-        </div>
-      </div>
-      {showWatchlistActions && <WatchListActions uid={stock.name} />}
-    </li>
-  );
-};
-
-const WatchListActions = ({ uid }) => {
-  const generalContext = useContext(GeneralContext);
-
-  const handleBuyClick = () => {
-    generalContext.openBuyWindow(uid);
-  };
-
-  return (
-    <span className="actions">
-      <span>
-        <Tooltip
-          title="Buy (B)"
-          placement="top"
-          arrow
-          TransitionComponent={Grow}
-          onClick={handleBuyClick}
-        >
-          <button className="buy">Buy</button>
-        </Tooltip>
-        <Tooltip
-          title="Sell (S)"
-          placement="top"
-          arrow
-          TransitionComponent={Grow}
-        >
-          <button className="sell">Sell</button>
-        </Tooltip>
-        <Tooltip
-          title="Analytics (A)"
-          placement="top"
-          arrow
-          TransitionComponent={Grow}
-        >
-          <button className="action">
-            <BarChartOutlined className="icon" />
-          </button>
-        </Tooltip>
-        <Tooltip title="More" placement="top" arrow TransitionComponent={Grow}>
-          <button className="action">
-            <MoreHoriz className="icon" />
-          </button>
-        </Tooltip>
-      </span>
-    </span>
-  );
-};
