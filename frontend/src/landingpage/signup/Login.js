@@ -1,18 +1,30 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { GoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
-
   const navigate = useNavigate();
+  const location = useLocation();
   const [inputValue, setInputValue] = useState({
     email: "",
     password: "",
   });
   const { email, password } = inputValue;
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const errorMsg = params.get("message");
+    if (errorMsg) {
+      toast.error(decodeURIComponent(errorMsg), {
+        position: "bottom-left",
+      });
+      // Clear URL query parameters so the message doesn't persist on refresh
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   const handleOnChange = (e) => {
     const { name, value } = e.target;
@@ -43,10 +55,13 @@ const Login = () => {
       );
       const { success, message } = data;
       if (success) {
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+        }
         handleSuccess(message);
         setTimeout(() => {
-          // Redirect to dashboard (assuming it's on localhost:3000)
-          window.location.href = "http://localhost:3000";
+          // Redirect to dashboard (assuming it's on localhost:3001)
+          window.location.href = `http://localhost:3001/?token=${data.token || ""}`;
         }, 1000);
 
       } else {
@@ -111,9 +126,12 @@ const Login = () => {
                     { withCredentials: true }
                   );
                   if (data.success) {
+                    if (data.token) {
+                      localStorage.setItem("token", data.token);
+                    }
                     handleSuccess(data.message);
                     setTimeout(() => {
-                      window.location.href = "http://localhost:3000";
+                      window.location.href = `http://localhost:3001/?token=${data.token || ""}`;
                     }, 1000);
                   } else {
                     handleError(data.message);

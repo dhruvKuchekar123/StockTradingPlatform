@@ -58,7 +58,7 @@ const FuturisticChart = () => {
         ticks: {
           color: '#a0a0a0',
           font: { size: 10 },
-          callback: (value) => '₹' + value,
+          callback: (value) => '$' + value,
         },
       },
     },

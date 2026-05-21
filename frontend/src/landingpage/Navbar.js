@@ -4,11 +4,15 @@ import Cookies from 'js-cookie';
 
 function Navbar() {
   const navigate = useNavigate();
-  const token = Cookies.get("token");
+  const token = localStorage.getItem("token") || Cookies.get("token");
 
   const handleLogout = () => {
-    Cookies.remove("token");
-    navigate("/login");
+    const confirmLogout = window.confirm("Are you sure you want to log out?");
+    if (confirmLogout) {
+      Cookies.remove("token", { path: "/" });
+      localStorage.removeItem("token");
+      navigate("/login");
+    }
   };
 
   return (
@@ -47,7 +51,7 @@ function Navbar() {
             ) : (
               <>
                 <li className="nav-item">
-                  <a className="nav-link" href="http://localhost:3000">Dashboard</a>
+                  <a className="nav-link" href={`http://localhost:3001/?token=${token}`}>Dashboard</a>
                 </li>
 
                 <li className="nav-item">

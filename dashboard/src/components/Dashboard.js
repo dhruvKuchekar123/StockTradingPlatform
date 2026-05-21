@@ -13,6 +13,7 @@ import WatchList from "./WatchList";
 import { GeneralContextProvider } from "./GeneralContext";
 import Analytics from "./Analytics";
 import Profile from "./Profile";
+import AdminDashboard from "./AdminDashboard";
 
 
 const Dashboard = () => {
@@ -30,6 +31,7 @@ const Dashboard = () => {
           <Route path="/funds" element={<Funds />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
       </div>
     </div>

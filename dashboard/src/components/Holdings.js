@@ -50,7 +50,7 @@ const Holdings = () => {
               const curValue = price * qty;
               const isProfit = curValue - avg * qty >= 0.0;
               const profClass = isProfit ? "profit" : "loss";
-              const dayClass = stock.isLoss ? "loss" : "profit";
+              const dayClass = stock.day.startsWith('-') ? "loss" : "profit";
 
               return (
                 <tr key={index}>
@@ -74,18 +74,21 @@ const Holdings = () => {
       <div className="row">
         <div className="col">
           <h5>
-            29,875.<span>55</span>
+            ${allHoldings.reduce((acc, stock) => acc + (Number(stock.avg) * Number(stock.qty)), 0).toFixed(2)}
           </h5>
           <p>Total investment</p>
         </div>
         <div className="col">
           <h5>
-            31,428.<span>95</span>
+            ${allHoldings.reduce((acc, stock) => acc + (Number(stock.price) * Number(stock.qty)), 0).toFixed(2)}
           </h5>
           <p>Current value</p>
         </div>
         <div className="col">
-          <h5>1,553.40 (+5.20%)</h5>
+          <h5>
+            {allHoldings.reduce((acc, stock) => acc + ((Number(stock.price) - Number(stock.avg)) * Number(stock.qty)), 0) >= 0 ? "+" : "-"}$
+            {Math.abs(allHoldings.reduce((acc, stock) => acc + ((Number(stock.price) - Number(stock.avg)) * Number(stock.qty)), 0)).toFixed(2)}
+          </h5>
           <p>P&L</p>
         </div>
       </div>

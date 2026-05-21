@@ -6,14 +6,18 @@ import 'react-toastify/dist/ReactToastify.css';
 import { GoogleLogin } from '@react-oauth/google';
 
 const Signup = () => {
-
   const navigate = useNavigate();
+
   const [inputValue, setInputValue] = useState({
     email: "",
     password: "",
     username: "",
+    accountName: "",
+    accountNumber: "",
+    ifscCode: "",
+    bankName: "",
   });
-  const { email, password, username } = inputValue;
+  const { email, password, username, accountName, accountNumber, ifscCode, bankName } = inputValue;
 
   const handleOnChange = (e) => {
     const { name, value } = e.target;
@@ -38,15 +42,21 @@ const Signup = () => {
       const { data } = await axios.post(
         "http://localhost:3002/signup",
         {
-          ...inputValue,
+          email, password, username,
+          bankDetails: {
+            accountName, accountNumber, ifscCode, bankName
+          }
         },
         { withCredentials: true }
       );
       const { success, message } = data;
       if (success) {
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+        }
         handleSuccess(message);
         setTimeout(() => {
-          navigate("/");
+          navigate("/login");
         }, 1500);
       } else {
         handleError(message);
@@ -106,6 +116,26 @@ const Signup = () => {
               required
             />
           </div>
+
+          <hr className="my-4" />
+          <h5 className="mb-3" style={{ fontWeight: "600", color: "#1a1a1a" }}>Bank Details (For KYC)</h5>
+
+          <div className="mb-3">
+            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Account Holder Name</label>
+            <input type="text" name="accountName" value={accountName} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter account name" onChange={handleOnChange} required />
+          </div>
+          <div className="mb-3">
+            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Account Number</label>
+            <input type="text" name="accountNumber" value={accountNumber} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter account number" onChange={handleOnChange} required />
+          </div>
+          <div className="mb-3">
+            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>IFSC Code</label>
+            <input type="text" name="ifscCode" value={ifscCode} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter IFSC code" onChange={handleOnChange} required />
+          </div>
+          <div className="mb-4">
+            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Bank Name</label>
+            <input type="text" name="bankName" value={bankName} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter bank name" onChange={handleOnChange} required />
+          </div>
           <button type="submit" className="btn btn-primary w-100 py-2 mb-3" style={{ borderRadius: "8px", fontWeight: "600", backgroundColor: "#0052fe", border: "none" }}>
             Sign Up
           </button>
@@ -120,9 +150,12 @@ const Signup = () => {
                     { withCredentials: true }
                   );
                   if (data.success) {
+                    if (data.token) {
+                      localStorage.setItem("token", data.token);
+                    }
                     handleSuccess(data.message);
                     setTimeout(() => {
-                      window.location.href = "http://localhost:3000";
+                      window.location.href = `http://localhost:3001/?token=${data.token || ""}`;
                     }, 1000);
                   } else {
                     handleError(data.message);

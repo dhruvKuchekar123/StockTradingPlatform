@@ -9,6 +9,7 @@ import {
   Layers, 
   LogOut,
   User as UserIcon,
+  Shield,
   ChevronDown
 } from "lucide-react";
 
@@ -18,7 +19,8 @@ const Menu = ({ username }) => {
 
   const handleLogout = () => {
     document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    window.location.href = "http://localhost:3001/login";
+    localStorage.removeItem("token");
+    window.location.href = "http://localhost:3000/login";
   };
 
   const menuItems = [
@@ -77,6 +79,14 @@ const Menu = ({ username }) => {
             >
               <UserIcon size={16} />
               My Profile
+            </Link>
+            <Link 
+              to="/admin" 
+              className="flex items-center gap-3 p-3 text-sm text-dim hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              onClick={() => setIsProfileDropdownOpen(false)}
+            >
+              <Shield size={16} />
+              Admin Panel
             </Link>
             <div className="h-px bg-border my-1" />
             <button 

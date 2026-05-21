@@ -11,17 +11,94 @@ const OrderActionWindow = ({ uid, mode }) => {
 
   const isBuy = mode === "BUY";
 
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleOrderClick = async () => {
-    try {
-      await axios.post("http://localhost:3002/newOrder", {
-        name: uid,
-        qty: stockQuantity,
-        price: stockPrice,
-        mode: mode,
-      });
-      closeOrderWindow();
-    } catch (error) {
-      console.error("Order failed", error);
+    if (isBuy) {
+      try {
+        const res = await loadRazorpay();
+        if (!res) {
+          alert("Razorpay SDK failed to load.");
+          return;
+        }
+
+        const { data } = await axios.post("http://localhost:3002/api/payments/create-order", {
+          symbol: uid,
+          qty: stockQuantity,
+          price: stockPrice,
+        }, { withCredentials: true });
+        
+        const { order, livePrice, razorpay_key } = data;
+
+        const options = {
+          key: "rzp_test_Sk37mMhAQgZ7kY", // Hardcoded test key to prevent env/trim issues
+          amount: Number(order.amount),
+          currency: "INR", // Test mode strictly expects INR in most Indian test accounts
+          name: "StockFlow",
+          description: `Buying ${stockQuantity} shares of ${uid}`,
+          order_id: order.id,
+          prefill: {
+            name: "Test User",
+            email: "testuser@example.com",
+            contact: "9999999999"
+          },
+          handler: async function (response) {
+              try {
+                  const verifyRes = await axios.post("http://localhost:3002/api/payments/verify-and-buy", {
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_signature: response.razorpay_signature,
+                      symbol: uid,
+                      qty: stockQuantity,
+                      price: livePrice
+                  }, { withCredentials: true });
+
+                  if(verifyRes.data.success) {
+                      alert(verifyRes.data.message + " An email receipt has been sent.");
+                      closeOrderWindow();
+                  }
+              } catch(e) {
+                  alert(e.response?.data?.message || "Payment verification failed!");
+              }
+          },
+          theme: { color: "#0052fe" }
+        };
+
+        const paymentObject = new window.Razorpay(options);
+
+        paymentObject.on('payment.failed', function (response) {
+            console.error("Razorpay Payment Failed:", response.error);
+            alert(`Payment Failed!\nReason: ${response.error.description}\nStep: ${response.error.step}`);
+        });
+
+        paymentObject.open();
+
+      } catch (error) {
+        console.error("Buy Order failed", error);
+        alert(error.response?.data?.message || "Failed to initiate payment.");
+      }
+    } else {
+      try {
+        const response = await axios.post("http://localhost:3002/newOrder", {
+          name: uid,
+          qty: stockQuantity,
+          price: stockPrice,
+          mode: "SELL",
+        }, { withCredentials: true });
+        alert((response.data.message || "Sold successfully!") + " An email receipt has been sent.");
+        closeOrderWindow();
+      } catch (error) {
+        console.error("Sell Order failed", error);
+        alert(error.response?.data?.message || "Failed to sell stock.");
+      }
     }
   };
 
@@ -44,7 +121,7 @@ const OrderActionWindow = ({ uid, mode }) => {
         <div className="flex justify-between mb-4 bg-white/5 p-3 rounded-lg border border-white/5">
           <div>
             <p className="text-[10px] text-dim m-0 uppercase tracking-wider">LTP</p>
-            <p className="text-xl font-bold m-0">₹{stockPrice.toFixed(2)}</p>
+            <p className="text-xl font-bold m-0">${stockPrice.toFixed(2)}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-dim m-0 uppercase tracking-wider">Change</p>
@@ -79,7 +156,7 @@ const OrderActionWindow = ({ uid, mode }) => {
 
       <div className="buy-window-footer">
         <div className="margin-info">
-          {isBuy ? 'Required' : 'Estimated Value'}: <span>₹{(stockQuantity * stockPrice).toFixed(2)}</span>
+          {isBuy ? 'Required' : 'Estimated Value'}: <span>${(stockQuantity * stockPrice).toFixed(2)}</span>
         </div>
         <div className="btn-group">
           <button className="btn-cancel" onClick={closeOrderWindow}>Cancel</button>

@@ -1,6 +1,7 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
+import axios from "axios";
 import GeneralContext from "./GeneralContext";
-import { watchlist } from "../data/data";
+import { watchlist as initialWatchlist } from "../data/data";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -15,8 +16,39 @@ import { Tooltip } from "@mui/material";
 
 const WatchList = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [liveWatchlist, setLiveWatchlist] = useState(initialWatchlist);
 
-  const filteredList = watchlist.filter(stock => 
+  useEffect(() => {
+    fetchLivePrices();
+    const interval = setInterval(fetchLivePrices, 60000); // Fetch every minute to stay under limits
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchLivePrices = async () => {
+    try {
+      const symbols = initialWatchlist.map(s => s.name);
+      const { data } = await axios.post("http://localhost:3002/api/market/live-prices", { symbols }, { withCredentials: true });
+      if (data.success && data.prices) {
+        setLiveWatchlist(prev => prev.map(stock => {
+           if (data.prices[stock.name]) {
+              const liveData = data.prices[stock.name];
+              const livePrice = typeof liveData === 'object' ? liveData.price : liveData;
+              const dp = typeof liveData === 'object' && liveData.dp !== undefined ? liveData.dp : null;
+              
+              const isDown = dp !== null ? dp < 0 : livePrice < Number(stock.price); 
+              const newPercent = dp !== null ? `${dp > 0 ? '+' : ''}${dp.toFixed(2)}%` : stock.percent;
+              
+              return { ...stock, price: livePrice.toFixed(2), isDown, percent: newPercent };
+           }
+           return stock;
+        }));
+      }
+    } catch(err) {
+      console.error("Failed to fetch live prices");
+    }
+  };
+
+  const filteredList = liveWatchlist.filter(stock => 
     stock.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -72,7 +104,7 @@ const WatchListItem = ({ stock }) => {
           <WatchListActions symbol={stock.name} />
         ) : (
           <>
-            <p className="stock-price">₹{stock.price}</p>
+            <p className="stock-price">${stock.price}</p>
             <p className={`text-xs ${stock.isDown ? 'text-danger' : 'text-success'}`}>
               {stock.percent}
             </p>

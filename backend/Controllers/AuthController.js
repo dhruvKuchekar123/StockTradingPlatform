@@ -29,14 +29,17 @@ module.exports.GoogleLogin = async (req, res, next) => {
 
     const secretToken = createSecretToken(user._id);
     res.cookie("token", secretToken, {
-      withCredentials: true,
+      path: "/",
       httpOnly: false,
+      secure: false,
+      sameSite: "lax",
     });
 
     res.status(201).json({
       message: "User logged in with Google successfully",
       success: true,
       user,
+      token: secretToken,
     });
     next();
   } catch (error) {
@@ -48,7 +51,7 @@ module.exports.GoogleLogin = async (req, res, next) => {
 
 module.exports.Signup = async (req, res, next) => {
   try {
-    const { email, password, username, createdAt } = req.body;
+    const { email, password, username, createdAt, bankDetails } = req.body;
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.json({ message: "User already exists" });
@@ -63,10 +66,12 @@ module.exports.Signup = async (req, res, next) => {
       createdAt,
       verificationToken,
       isVerified: false,
+      bankDetails: bankDetails || { accountName: "", accountNumber: "", ifscCode: "", bankName: "" },
+      isApproved: false,
     });
 
     // Send Verification Email
-    const verifyUrl = `http://localhost:3001/verify-email/${verificationToken}`;
+    const verifyUrl = `http://localhost:3000/verify-email/${verificationToken}`;
     const emailHtml = `
       <h1>Verify your Email</h1>
       <p>Please click the link below to verify your email for StockFlow:</p>
@@ -76,15 +81,23 @@ module.exports.Signup = async (req, res, next) => {
 
     const token = createSecretToken(user._id);
     res.cookie("token", token, {
-      withCredentials: true,
+      path: "/",
       httpOnly: false,
+      secure: false,
+      sameSite: "lax",
     });
     res
       .status(201)
-      .json({ message: "User signed in successfully. Please check your email for verification.", success: true, user });
+      .json({ 
+        message: "User signed in successfully. Please check your email for verification.", 
+        success: true, 
+        user,
+        token
+      });
     next();
   } catch (error) {
-    console.error(error);
+    console.error("Signup error:", error);
+    res.status(500).json({ message: "Internal server error during signup", success: false });
   }
 };
 
@@ -122,7 +135,7 @@ module.exports.ForgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    const resetUrl = `http://localhost:3001/reset-password/${resetToken}`;
+    const resetUrl = `http://localhost:3000/reset-password/${resetToken}`;
     const emailHtml = `
       <h1>Reset Password</h1>
       <p>Click the link below to reset your StockFlow password:</p>
@@ -174,6 +187,29 @@ module.exports.GetProfile = async (req, res) => {
   }
 };
 
+module.exports.UpdateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { username, phoneNumber, address, bio } = req.body;
+    
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (username) user.username = username;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+    if (address !== undefined) user.address = address;
+    if (bio !== undefined) user.bio = bio;
+    
+    await user.save();
+    
+    const updatedUser = await User.findById(userId).select("-password");
+    res.json({ success: true, message: "Profile updated successfully", user: updatedUser });
+  } catch (error) {
+    console.error("UpdateProfile Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 module.exports.Login = async (req, res, next) => {
   try {
@@ -191,14 +227,17 @@ module.exports.Login = async (req, res, next) => {
     }
     const token = createSecretToken(user._id);
     res.cookie("token", token, {
-      withCredentials: true,
+      path: "/",
       httpOnly: false,
+      secure: false,
+      sameSite: "lax",
     });
     res
       .status(201)
-      .json({ message: "User logged in successfully", success: true });
+      .json({ message: "User logged in successfully", success: true, token });
     next();
   } catch (error) {
-    console.error(error);
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error during login", success: false });
   }
 };

@@ -1,7 +1,24 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 const Funds = () => {
+  const [balance, setBalance] = useState(0);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data } = await axios.get("http://localhost:3002/api/user/profile", { withCredentials: true });
+        if (data.success) {
+          setBalance(data.walletBalance || 0);
+        }
+      } catch(err) {
+        console.error("Failed to fetch profile data");
+      }
+    };
+    fetchProfile();
+  }, []);
+
   return (
     <>
       <div className="funds">
@@ -19,28 +36,24 @@ const Funds = () => {
           <div className="table">
             <div className="data">
               <p>Available margin</p>
-              <p className="imp colored">4,043.10</p>
+              <p className="imp colored">${balance.toFixed(2)}</p>
             </div>
             <div className="data">
               <p>Used margin</p>
-              <p className="imp">3,757.30</p>
+              <p className="imp">$0.00</p>
             </div>
             <div className="data">
               <p>Available cash</p>
-              <p className="imp">4,043.10</p>
+              <p className="imp">${balance.toFixed(2)}</p>
             </div>
             <hr />
             <div className="data">
               <p>Opening Balance</p>
-              <p>4,043.10</p>
-            </div>
-            <div className="data">
-              <p>Opening Balance</p>
-              <p>3736.40</p>
+              <p>${balance.toFixed(2)}</p>
             </div>
             <div className="data">
               <p>Payin</p>
-              <p>4064.00</p>
+              <p>$0.00</p>
             </div>
             <div className="data">
               <p>SPAN</p>

@@ -4,73 +4,296 @@ import axios from "axios";
 const Profile = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    username: "",
+    phoneNumber: "",
+    address: "",
+    bio: ""
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data } = await axios.get("http://localhost:3002/profile", {
-          withCredentials: true,
-        });
-        if (data.success) {
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error("Failed to fetch profile", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchProfile();
   }, []);
 
-  if (loading) return <div className="p-5 text-center">Loading Profile...</div>;
-  if (!user) return <div className="p-5 text-center">User not found</div>;
+  const fetchProfile = async () => {
+    try {
+      const { data } = await axios.get("http://localhost:3002/profile", {
+        withCredentials: true,
+      });
+      if (data.success) {
+        setUser(data.user);
+        setFormData({
+          username: data.user.username || "",
+          phoneNumber: data.user.phoneNumber || "",
+          address: data.user.address || "",
+          bio: data.user.bio || ""
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch profile", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const { data } = await axios.put("http://localhost:3002/profile", formData, {
+        withCredentials: true,
+      });
+      if (data.success) {
+        setUser(data.user);
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error("Failed to update profile", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div style={styles.loadingContainer}><div className="spinner-border text-light" role="status"></div></div>;
+  if (!user) return <div style={styles.loadingContainer}>User not found</div>;
 
   return (
-    <div className="profile-container p-5" style={{ backgroundColor: "#fff", minHeight: "100vh" }}>
-      <div className="card shadow-sm p-4 border-0" style={{ maxWidth: "600px", margin: "0 auto", borderRadius: "15px" }}>
-        <div className="text-center mb-4">
-          <div className="avatar mb-3" style={{ 
-            width: "100px", 
-            height: "100px", 
-            borderRadius: "50%", 
-            backgroundColor: "#0052fe", 
-            color: "white", 
-            fontSize: "40px", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            margin: "0 auto"
-          }}>
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <div style={styles.header}>
+          <div style={styles.avatar}>
             {user.username.charAt(0).toUpperCase()}
           </div>
-          <h2 style={{ fontWeight: "700" }}>{user.username}</h2>
-          <p className="text-muted">{user.email}</p>
+          <h2 style={styles.title}>{user.username}</h2>
+          <p style={styles.subtitle}>{user.email}</p>
         </div>
 
-        <div className="profile-details mt-4">
-          <div className="detail-item mb-3 p-3" style={{ borderBottom: "1px solid #eee" }}>
-            <span className="text-muted d-block">Account Status</span>
-            <span className={user.isVerified ? "text-success" : "text-warning"} style={{ fontWeight: "600" }}>
-              {user.isVerified ? "Verified" : "Verification Pending"}
-            </span>
+        {isEditing ? (
+          <form onSubmit={handleSubmit} style={styles.form}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Username</label>
+              <input style={styles.input} type="text" name="username" value={formData.username} onChange={handleInputChange} required />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Phone Number</label>
+              <input style={styles.input} type="text" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Address</label>
+              <input style={styles.input} type="text" name="address" value={formData.address} onChange={handleInputChange} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Bio</label>
+              <textarea style={{...styles.input, minHeight: '80px', resize: 'vertical'}} name="bio" value={formData.bio} onChange={handleInputChange} />
+            </div>
+            <div style={styles.buttonGroup}>
+              <button type="button" onClick={() => setIsEditing(false)} style={styles.cancelBtn}>Cancel</button>
+              <button type="submit" style={styles.saveBtn} disabled={saving}>
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div style={styles.details}>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Account Status</span>
+              <span style={{...styles.detailValue, color: user.isVerified ? "#4caf50" : "#ff9800"}}>
+                {user.isVerified ? "Verified" : "Verification Pending"}
+              </span>
+            </div>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Phone Number</span>
+              <span style={styles.detailValue}>{user.phoneNumber || "Not provided"}</span>
+            </div>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Address</span>
+              <span style={styles.detailValue}>{user.address || "Not provided"}</span>
+            </div>
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Bio</span>
+              <span style={styles.detailValue}>{user.bio || "No bio yet"}</span>
+            </div>
+            <div style={styles.detailRow} style={{...styles.detailRow, borderBottom: 'none'}}>
+              <span style={styles.detailLabel}>Joined On</span>
+              <span style={styles.detailValue}>{new Date(user.createdAt).toLocaleDateString()}</span>
+            </div>
+            
+            <button onClick={() => setIsEditing(true)} style={styles.editBtn}>
+              Edit Profile
+            </button>
           </div>
-          <div className="detail-item mb-3 p-3" style={{ borderBottom: "1px solid #eee" }}>
-            <span className="text-muted d-block">Joined On</span>
-            <span style={{ fontWeight: "600" }}>{new Date(user.createdAt).toLocaleDateString()}</span>
-          </div>
-          <div className="detail-item mb-3 p-3" style={{ borderBottom: "1px solid #eee" }}>
-            <span className="text-muted d-block">User ID</span>
-            <span style={{ fontWeight: "600" }}>{user._id}</span>
-          </div>
-        </div>
+        )}
         
-        <button className="btn btn-outline-primary w-100 mt-4" style={{ borderRadius: "8px" }} onClick={() => window.location.href = "http://localhost:3001"}>
+        <button onClick={() => window.location.href = "http://localhost:3000"} style={styles.backBtn}>
           Back to Main Website
         </button>
       </div>
     </div>
   );
+};
+
+const styles = {
+  container: {
+    backgroundColor: "#0a0a0a",
+    minHeight: "100vh",
+    padding: "40px 20px",
+    display: "flex",
+    justifyContent: "center",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    color: "#e0e0e0"
+  },
+  loadingContainer: {
+    backgroundColor: "#0a0a0a",
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontSize: "18px"
+  },
+  card: {
+    backgroundColor: "#141414",
+    borderRadius: "16px",
+    padding: "40px",
+    width: "100%",
+    maxWidth: "500px",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+    border: "1px solid #2a2a2a",
+    display: "flex",
+    flexDirection: "column"
+  },
+  header: {
+    textAlign: "center",
+    marginBottom: "30px"
+  },
+  avatar: {
+    width: "100px",
+    height: "100px",
+    borderRadius: "50%",
+    backgroundColor: "#3a86ff",
+    color: "#fff",
+    fontSize: "40px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 20px",
+    fontWeight: "bold",
+    boxShadow: "0 4px 15px rgba(58, 134, 255, 0.4)"
+  },
+  title: {
+    margin: "0 0 5px",
+    fontSize: "24px",
+    fontWeight: "700",
+    color: "#ffffff"
+  },
+  subtitle: {
+    margin: "0",
+    color: "#a0a0a0",
+    fontSize: "14px"
+  },
+  details: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: "12px",
+    padding: "20px",
+    marginBottom: "20px"
+  },
+  detailRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "15px 0",
+    borderBottom: "1px solid #2a2a2a"
+  },
+  detailLabel: {
+    color: "#888",
+    fontSize: "14px",
+    fontWeight: "500"
+  },
+  detailValue: {
+    color: "#ddd",
+    fontSize: "14px",
+    fontWeight: "600",
+    textAlign: "right",
+    maxWidth: "60%",
+    wordBreak: "break-word"
+  },
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "15px",
+    marginBottom: "20px"
+  },
+  formGroup: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "5px"
+  },
+  label: {
+    fontSize: "13px",
+    color: "#aaa",
+    fontWeight: "500"
+  },
+  input: {
+    backgroundColor: "#1f1f1f",
+    border: "1px solid #333",
+    borderRadius: "8px",
+    padding: "12px 15px",
+    color: "#fff",
+    fontSize: "14px",
+    outline: "none"
+  },
+  buttonGroup: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "10px"
+  },
+  editBtn: {
+    width: "100%",
+    padding: "12px",
+    backgroundColor: "#3a86ff",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer",
+    marginTop: "20px"
+  },
+  saveBtn: {
+    flex: 1,
+    padding: "12px",
+    backgroundColor: "#4caf50",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer"
+  },
+  cancelBtn: {
+    flex: 1,
+    padding: "12px",
+    backgroundColor: "transparent",
+    color: "#bbb",
+    border: "1px solid #444",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer"
+  },
+  backBtn: {
+    width: "100%",
+    padding: "12px",
+    backgroundColor: "transparent",
+    color: "#3a86ff",
+    border: "1px solid #3a86ff",
+    borderRadius: "8px",
+    fontWeight: "600",
+    cursor: "pointer"
+  }
 };
 
 export default Profile;
