@@ -12,18 +12,58 @@ if (!GOOGLE_CLIENT_ID) {
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 module.exports.GoogleLogin = async (req, res, next) => {
+  let payload;
   try {
     const { token } = req.body;
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: GOOGLE_CLIENT_ID,
     });
-    const { email, name } = ticket.getPayload();
+    payload = ticket.getPayload();
+  } catch (error) {
+    // Distinguish a transient Google/network failure from an invalid token.
+    // Network-level errors (DNS, connection reset, timeout, TLS) surface as
+    // system error codes or generic fetch failures — these are our fault/Google's,
+    // not the user's, so return a 502 (Bad Gateway) instead of a 400.
+    const networkCodes = ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ECONNABORTED"];
+    const msg = (error && error.message) || "";
+    const isNetworkError =
+      networkCodes.includes(error && error.code) ||
+      /network|timed? ?out|fetch failed|socket hang up|getaddrinfo|ENETUNREACH/i.test(msg);
 
-    let user = await User.findOne({ email });
+    if (isNetworkError) {
+      console.error("Google Login upstream error:", msg);
+      return res.status(502).json({
+        success: false,
+        message: "Could not reach Google to verify your sign-in. Please try again in a moment.",
+      });
+    }
+    console.error("Google Login Error:", msg);
+    return res.status(400).json({ success: false, message: "Google Login failed" });
+  }
+
+  try {
+    const { email, name, email_verified } = payload;
+
+    // 1. Reject sign-ins whose Google email is not verified. An unverified email
+    //    is not a proven identity and must never be silently accepted or linked.
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Google account did not provide an email address" });
+    }
+    if (email_verified === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Your Google email is not verified. Please verify it with Google, then try again.",
+      });
+    }
+
+    // 2. Match existing accounts by email, case-insensitively, so a Google sign-in
+    //    links to an existing password account instead of creating a duplicate user.
+    const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let user = await User.findOne({ email: { $regex: `^${escaped}$`, $options: "i" } });
 
     if (!user) {
-      // Use cryptographically random placeholder password for Google-only accounts
+      // No existing account — create a Google-only account with a random placeholder password.
       const placeholderPassword = crypto.randomBytes(32).toString("hex");
       user = await User.create({
         email,
@@ -32,6 +72,11 @@ module.exports.GoogleLogin = async (req, res, next) => {
         isVerified: true,
         isApproved: true,
       });
+    } else if (!user.isVerified) {
+      // Linking to a pre-existing account: a verified Google email proves ownership,
+      // so promote the account to verified without touching its password.
+      user.isVerified = true;
+      await user.save();
     }
 
     const secretToken = createSecretToken(user._id);
@@ -56,8 +101,10 @@ module.exports.GoogleLogin = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error("Google Login Error:", error.message);
-    return res.status(400).json({ success: false, message: "Google Login failed" });
+    // Token is already verified at this point; a failure here is server-side
+    // (database/session), so surface it as a 500 rather than a 400.
+    console.error("Google Login post-verification error:", error.message);
+    return res.status(500).json({ success: false, message: "Internal server error during Google login" });
   }
 };
 
