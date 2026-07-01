@@ -15,9 +15,16 @@ import ResetPassword from './landingpage/signup/ResetPassword';
 import VerifyEmail from './landingpage/signup/VerifyEmail';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
+// Google OAuth client ID is public (it ships in the browser bundle). Prefer an
+// env override (REACT_APP_GOOGLE_CLIENT_ID) so different environments can point
+// at different OAuth clients; fall back to the default project client ID.
+const GOOGLE_CLIENT_ID =
+  process.env.REACT_APP_GOOGLE_CLIENT_ID ||
+  "598164736092-urhrchs4c87n8o0fntb5j2ih0629ea6d.apps.googleusercontent.com";
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <GoogleOAuthProvider clientId="598164736092-urhrchs4c87n8o0fntb5j2ih0629ea6d.apps.googleusercontent.com">
+  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
     <BrowserRouter>
       <Routes>
         <Route path='/' element={<App />}></Route>
