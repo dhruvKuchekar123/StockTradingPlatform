@@ -177,23 +177,32 @@ module.exports.verifyPayment = async (req, res) => {
         }
         session.endSession();
 
-        // Concurrent duplicate confirmation lost the race on the partial unique
-        // index (one SUCCESS per order). Someone else already credited it.
-        if (error && error.code === 11000) {
-            const user = await UserModel.findById(userId);
-            return res.status(200).json({
-                success: true,
-                message: "Payment verified successfully (already processed).",
-                walletBalance: user ? user.walletBalance : undefined
-            });
+        // A concurrent duplicate confirmation may have already credited this order
+        // (it lost the race on the unique index / a write conflict). Re-check for a
+        // winning SUCCESS row and, if present, report already-processed WITHOUT
+        // touching it — otherwise the reconciliation write below would clobber it.
+        try {
+            const winner = await WalletTransaction.findOne({ razorpayOrderId: razorpay_order_id, status: "SUCCESS" });
+            if (winner) {
+                const user = await UserModel.findById(userId);
+                return res.status(200).json({
+                    success: true,
+                    message: "Payment verified successfully (already processed).",
+                    walletBalance: user ? user.walletBalance : undefined
+                });
+            }
+        } catch (lookupErr) {
+            console.error("Winner re-check failed:", lookupErr.message);
         }
 
-        // Payment was confirmed but the wallet credit failed. Do NOT lose it —
-        // park the transaction as PENDING_RECONCILIATION so it shows up as
+        // Payment was confirmed but the wallet credit genuinely failed. Do NOT lose
+        // it — park the transaction as PENDING_RECONCILIATION so it shows up as
         // "processing" in history and can be recovered, rather than vanishing.
+        // The { status: { $ne: SUCCESS } } filter is a second guard so we never
+        // overwrite an already-credited row.
         try {
             await WalletTransaction.findOneAndUpdate(
-                { razorpayOrderId: razorpay_order_id },
+                { razorpayOrderId: razorpay_order_id, status: { $ne: "SUCCESS" } },
                 { $set: { userId, razorpayPaymentId: razorpay_payment_id, amount: amountINR, status: "PENDING_RECONCILIATION" } },
                 { upsert: true, new: true, setDefaultsOnInsert: true }
             );
