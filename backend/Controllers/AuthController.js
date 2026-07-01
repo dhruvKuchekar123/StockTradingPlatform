@@ -78,6 +78,10 @@ module.exports.GoogleLogin = async (req, res, next) => {
       user.isVerified = true;
     }
 
+    if (user.suspended) {
+      return res.status(403).json({ success: false, message: "Your account has been suspended. Please contact support." });
+    }
+
     user.lastLogin = new Date();
     await user.save();
 
@@ -424,6 +428,9 @@ module.exports.Login = async (req, res, next) => {
     const auth = await bcrypt.compare(password, user.password);
     if (!auth) {
       return res.status(401).json({ success: false, message: "Incorrect password or email" });
+    }
+    if (user.suspended) {
+      return res.status(403).json({ success: false, message: "Your account has been suspended. Please contact support." });
     }
     user.lastLogin = new Date();
     await user.save();

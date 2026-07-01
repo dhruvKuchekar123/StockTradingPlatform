@@ -16,6 +16,8 @@ import AdminUsers from "./admin/AdminUsers";
 import AdminOrders from "./admin/AdminOrders";
 import AdminWallet from "./admin/AdminWallet";
 import AdminHealth from "./admin/AdminHealth";
+import AdminEmails from "./admin/AdminEmails";
+import AdminAudit from "./admin/AdminAudit";
 import MarketNews from "./MarketNews";
 import AIInsights from "./AIInsights";
 import OnboardingTour from "./OnboardingTour";
@@ -42,7 +44,9 @@ const Dashboard = () => {
               <Route path="users" element={<AdminUsers />} />
               <Route path="orders" element={<AdminOrders />} />
               <Route path="wallet" element={<AdminWallet />} />
+              <Route path="emails" element={<AdminEmails />} />
               <Route path="health" element={<AdminHealth />} />
+              <Route path="audit" element={<AdminAudit />} />
             </Route>
           </Routes>
         </div>

@@ -168,6 +168,31 @@ module.exports.getWalletOverview = async (req, res) => {
     }
 };
 
+// Failed-email queue listing (so an admin can pick one to resend)
+module.exports.getFailedEmails = async (req, res) => {
+    try {
+        const { page, limit, skip } = paginate(req, 25);
+        const status = (req.query.status || "PENDING").toUpperCase();
+        const query = status === "ALL" ? {} : { status };
+        const [total, items] = await Promise.all([
+            FailedEmail.countDocuments(query),
+            FailedEmail.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        ]);
+        return res.json({
+            success: true,
+            emails: items.map((e) => ({
+                id: e._id, to: e.to, subject: e.subject, type: e.type,
+                status: e.status, attempts: e.attempts, lastError: e.lastError,
+                createdAt: e.createdAt, lastAttemptAt: e.lastAttemptAt,
+            })),
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        console.error("[Admin] getFailedEmails error:", error);
+        return res.status(500).json({ success: false, message: "Error fetching failed emails" });
+    }
+};
+
 // 4. System health panel
 module.exports.getSystemHealth = async (req, res) => {
     try {

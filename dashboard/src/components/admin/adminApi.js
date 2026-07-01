@@ -6,6 +6,9 @@ export const API_BASE = (process.env.REACT_APP_API_HOST || "http://localhost:300
 export const adminGet = (path, params) =>
   axios.get(`${API_BASE}${path}`, { params, withCredentials: true }).then((r) => r.data);
 
+export const adminPost = (path, body) =>
+  axios.post(`${API_BASE}${path}`, body, { withCredentials: true }).then((r) => r.data);
+
 export const formatINR = (v) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(v || 0));
 

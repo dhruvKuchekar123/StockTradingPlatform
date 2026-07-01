@@ -72,6 +72,29 @@ module.exports.retryFailedEmails = async (limit = 50) => {
   return { processed: pending.length, sent, stillFailing };
 };
 
+/**
+ * Resend a single queued failure by its id. Returns enough state for the caller
+ * to write an audit entry. Never throws.
+ */
+module.exports.resendFailedEmail = async (id) => {
+  const item = await FailedEmail.findById(id);
+  if (!item) return { found: false };
+  const before = { status: item.status, attempts: item.attempts };
+  try {
+    await transporter.sendMail({ from: item.from, to: item.to, subject: item.subject, html: item.html });
+    item.status = "SENT";
+    item.lastAttemptAt = new Date();
+    await item.save();
+    return { found: true, sent: true, to: item.to, type: item.type, before, after: { status: "SENT", attempts: item.attempts } };
+  } catch (err) {
+    item.attempts += 1;
+    item.lastError = err.message;
+    item.lastAttemptAt = new Date();
+    await item.save();
+    return { found: true, sent: false, to: item.to, type: item.type, before, after: { status: item.status, attempts: item.attempts }, error: err.message };
+  }
+};
+
 module.exports.sendEmail = async (to, subject, html) => {
   const mailOptions = {
     from: `"StockFlow" <${process.env.EMAIL_USER}>`,

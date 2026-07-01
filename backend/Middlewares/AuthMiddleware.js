@@ -79,6 +79,9 @@ module.exports.checkUserStatus = (req, res) => {
     if (err) return res.json({ status: false });
     const user = await User.findById(data.id);
     if (user) {
+      if (user.suspended) {
+        return res.json({ status: false, code: "SUSPENDED", message: "Your account has been suspended. Please contact support." });
+      }
       if (!user.isVerified) {
         return res.json({ status: false, code: "NOT_VERIFIED", message: "Please verify your email first." });
       }

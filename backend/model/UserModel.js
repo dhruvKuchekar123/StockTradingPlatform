@@ -50,6 +50,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  suspended: {
+    type: Boolean,
+    default: false, // blocks login; does NOT delete any data
+  },
   bankDetails: {
     accountName: { type: String, default: "" },
     accountNumber: { type: String, default: "" },

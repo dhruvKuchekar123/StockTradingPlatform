@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import axios from "axios";
-import { Users, ClipboardList, Wallet, Activity, ShieldAlert, Loader2 } from "lucide-react";
+import { Users, ClipboardList, Wallet, Activity, Mail, ScrollText, ShieldAlert, Loader2 } from "lucide-react";
 
 const AUTH_HOST = process.env.REACT_APP_API_HOST || "http://localhost:3002";
 
@@ -40,7 +40,9 @@ const AdminLayout = () => {
     { to: "/admin/users", label: "Users", icon: Users },
     { to: "/admin/orders", label: "Orders", icon: ClipboardList },
     { to: "/admin/wallet", label: "Wallet", icon: Wallet },
+    { to: "/admin/emails", label: "Emails", icon: Mail },
     { to: "/admin/health", label: "System Health", icon: Activity },
+    { to: "/admin/audit", label: "Audit Log", icon: ScrollText },
   ];
 
   return (

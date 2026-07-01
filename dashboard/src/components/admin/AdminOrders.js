@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { adminGet, fmtDate } from "./adminApi";
+import { adminGet, adminPost, fmtDate } from "./adminApi";
+import ConfirmModal from "./ConfirmModal";
 
 const th = { padding: "12px", color: "var(--text-dim)", fontSize: 12, fontWeight: 600, textAlign: "left" };
 const td = { padding: "12px", fontSize: 14, borderBottom: "1px solid rgba(255,255,255,0.03)" };
@@ -14,6 +15,14 @@ const AdminOrders = () => {
   const [orderType, setOrderType] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [modal, setModal] = useState(null);
+
+  const askCancel = (o) => setModal({
+    title: "Cancel stuck order",
+    message: `Force-cancel ${o.side} ${o.qty} ${o.symbol} (${o.orderType}, ${o.status}) for ${o.user}? Use only for genuinely broken orders. This is logged to the audit trail.`,
+    confirmLabel: "Cancel order",
+    onConfirm: async (reason) => { await adminPost(`/orders/${o.id}/cancel`, { reason }); setModal(null); load(); },
+  });
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -55,7 +64,7 @@ const AdminOrders = () => {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr style={{ borderBottom: "1px solid var(--border)" }}>
             <th style={th}>USER</th><th style={th}>SYMBOL</th><th style={th}>SIDE</th><th style={th}>QTY</th>
-            <th style={th}>TYPE</th><th style={th}>STATUS</th><th style={th}>PRICE</th><th style={th}>PLACED</th>
+            <th style={th}>TYPE</th><th style={th}>STATUS</th><th style={th}>PRICE</th><th style={th}>PLACED</th><th style={th}>ACTIONS</th>
           </tr></thead>
           <tbody>
             {data.orders.map((o) => (
@@ -68,9 +77,14 @@ const AdminOrders = () => {
                 <td style={{ ...td, color: statusColor(o.status), fontWeight: 700, fontSize: 12 }}>{o.status}</td>
                 <td style={{ ...td, fontFamily: "var(--font-mono)" }}>{o.price != null ? `₹${o.price}` : "—"}</td>
                 <td style={td}>{fmtDate(o.placedAt)}</td>
+                <td style={td}>
+                  {["OPEN", "PENDING", "TRIGGERED"].includes(o.status)
+                    ? <button onClick={() => askCancel(o)} style={{ padding: "5px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid var(--border)", background: "rgba(255,255,255,0.04)", color: "#EF4444" }}>Cancel</button>
+                    : <span style={{ color: "var(--text-dim)", fontSize: 12 }}>—</span>}
+                </td>
               </tr>
             ))}
-            {!loading && data.orders.length === 0 && <tr><td style={{ ...td, textAlign: "center", padding: 30 }} colSpan={8}>No orders match these filters.</td></tr>}
+            {!loading && data.orders.length === 0 && <tr><td style={{ ...td, textAlign: "center", padding: 30 }} colSpan={9}>No orders match these filters.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -80,6 +94,8 @@ const AdminOrders = () => {
         <span style={{ color: "var(--text-dim)", fontSize: 13 }}>Page {data.pagination.page} / {data.pagination.totalPages}</span>
         <button disabled={page >= data.pagination.totalPages || loading} onClick={() => setPage((p) => p + 1)} className="btn">Next</button>
       </div>
+
+      <ConfirmModal open={!!modal} {...(modal || {})} onCancel={() => setModal(null)} />
     </div>
   );
 };
