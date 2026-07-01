@@ -4,6 +4,9 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { GoogleLogin } from '@react-oauth/google';
+import "./Auth.css";
+
+const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3001";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -60,8 +63,7 @@ const Login = () => {
         }
         handleSuccess(message);
         setTimeout(() => {
-          // Redirect to dashboard (assuming it's on localhost:3001)
-          window.location.href = `http://localhost:3001/?token=${data.token || ""}`;
+          window.location.href = `${DASHBOARD_URL}/?token=${data.token || ""}`;
         }, 1000);
 
       } else {
@@ -78,45 +80,50 @@ const Login = () => {
   };
 
   return (
-    <div className="container mt-5 mb-5 animate-fade-in" style={{ maxWidth: "450px" }}>
-      <div className="card shadow-sm p-4" style={{ borderRadius: "12px", border: "none", backgroundColor: "#ffffff" }}>
-        <h2 className="text-center mb-4" style={{ fontWeight: "700", color: "#1a1a1a" }}>Welcome Back</h2>
+    <div className="auth-page">
+      <div className="auth-backdrop" />
+      <div className="auth-card auth-card--compact">
+        <div className="auth-card-header">
+          <div>
+            <span className="auth-kicker">Stock Flow Pro</span>
+            <h2><span>↘</span> Welcome Back</h2>
+          </div>
+          <Link className="auth-close" to="/">×</Link>
+        </div>
+        <p className="auth-copy">Login to continue to your live trading dashboard, watchlists, orders, and portfolio.</p>
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Email address</label>
+          <div className="auth-field">
+            <label>Email address</label>
             <input
               type="email"
               name="email"
               value={email}
-              className="form-control shadow-none"
-              style={{ borderRadius: "8px", padding: "10px" }}
               placeholder="Enter your email"
               onChange={handleOnChange}
               required
             />
           </div>
-          <div className="mb-4">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Password</label>
+          <div className="auth-field">
+            <label>Password</label>
             <input
               type="password"
               name="password"
               value={password}
-              className="form-control shadow-none"
-              style={{ borderRadius: "8px", padding: "10px" }}
               placeholder="Enter your password"
               onChange={handleOnChange}
               required
             />
           </div>
-          <button type="submit" className="btn btn-success w-100 py-2 mb-3" style={{ borderRadius: "8px", fontWeight: "600", backgroundColor: "#00d084", border: "none" }}>
+          <button type="submit" className="auth-submit">
             Login
           </button>
           
-          <div className="text-center mb-3">
-            <Link to="/forgot-password" style={{ textDecoration: "none", fontSize: "14px", color: "#666" }}>Forgot Password?</Link>
+          <div className="auth-link-row">
+            <Link to="/forgot-password">Forgot Password?</Link>
           </div>
 
-          <div className="d-flex justify-content-center mb-3">
+          <div className="auth-google">
+            <span>or continue with Google</span>
             <GoogleLogin
               onSuccess={async (credentialResponse) => {
                 try {
@@ -131,7 +138,7 @@ const Login = () => {
                     }
                     handleSuccess(data.message);
                     setTimeout(() => {
-                      window.location.href = `http://localhost:3001/?token=${data.token || ""}`;
+                      window.location.href = `${DASHBOARD_URL}/?token=${data.token || ""}`;
                     }, 1000);
                   } else {
                     handleError(data.message);
@@ -149,12 +156,12 @@ const Login = () => {
 
           </div>
 
-          <div className="text-center">
-            <span style={{ color: "#666" }}>Don't have an account? <Link to={"/signup"} style={{ textDecoration: "none", fontWeight: "600", color: "#00d084" }}>Sign Up</Link></span>
+          <div className="auth-switch">
+            <span>Don't have an account? <Link to={"/signup"}>Sign Up</Link></span>
           </div>
         </form>
       </div>
-      <ToastContainer />
+      <ToastContainer toastClassName="auth-toast" />
     </div>
   );
 };

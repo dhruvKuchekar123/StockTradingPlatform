@@ -4,6 +4,9 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { GoogleLogin } from '@react-oauth/google';
+import "./Auth.css";
+
+const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3001";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -73,74 +76,79 @@ const Signup = () => {
   };
 
   return (
-    <div className="container mt-5 mb-5 animate-fade-in" style={{ maxWidth: "450px" }}>
-      <div className="card shadow-sm p-4" style={{ borderRadius: "12px", border: "none", backgroundColor: "#ffffff" }}>
-        <h2 className="text-center mb-4" style={{ fontWeight: "700", color: "#1a1a1a" }}>Create Account</h2>
+    <div className="auth-page">
+      <div className="auth-backdrop" />
+      <div className="auth-card">
+        <div className="auth-card-header">
+          <div>
+            <span className="auth-kicker">Stock Flow Pro</span>
+            <h2><span>↘</span> Create Account</h2>
+          </div>
+          <Link className="auth-close" to="/">×</Link>
+        </div>
+        <p className="auth-copy">Open your trading account and connect KYC details for dashboard access.</p>
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Email address</label>
+          <div className="auth-field">
+            <label>Email address</label>
             <input
               type="email"
               name="email"
               value={email}
-              className="form-control shadow-none"
-              style={{ borderRadius: "8px", padding: "10px" }}
               placeholder="Enter your email"
               onChange={handleOnChange}
               required
             />
           </div>
-          <div className="mb-3">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Username</label>
+          <div className="auth-field">
+            <label>Username</label>
             <input
               type="text"
               name="username"
               value={username}
-              className="form-control shadow-none"
-              style={{ borderRadius: "8px", padding: "10px" }}
               placeholder="Enter your username"
               onChange={handleOnChange}
               required
             />
           </div>
-          <div className="mb-4">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Password</label>
+          <div className="auth-field">
+            <label>Password</label>
             <input
               type="password"
               name="password"
               value={password}
-              className="form-control shadow-none"
-              style={{ borderRadius: "8px", padding: "10px" }}
               placeholder="Enter your password"
               onChange={handleOnChange}
               required
             />
           </div>
 
-          <hr className="my-4" />
-          <h5 className="mb-3" style={{ fontWeight: "600", color: "#1a1a1a" }}>Bank Details (For KYC)</h5>
+          <div className="auth-divider" />
+          <h5 className="auth-section-title">Bank Details (For KYC)</h5>
 
-          <div className="mb-3">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Account Holder Name</label>
-            <input type="text" name="accountName" value={accountName} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter account name" onChange={handleOnChange} required />
+          <div className="auth-field">
+            <label>Account Holder Name</label>
+            <input type="text" name="accountName" value={accountName} placeholder="Enter account name" onChange={handleOnChange} required />
           </div>
-          <div className="mb-3">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Account Number</label>
-            <input type="text" name="accountNumber" value={accountNumber} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter account number" onChange={handleOnChange} required />
+          <div className="auth-field-grid">
+            <div className="auth-field">
+              <label>Account Number</label>
+              <input type="text" name="accountNumber" value={accountNumber} placeholder="Enter account number" onChange={handleOnChange} required />
+            </div>
+            <div className="auth-field">
+              <label>IFSC Code</label>
+              <input type="text" name="ifscCode" value={ifscCode} placeholder="Enter IFSC code" onChange={handleOnChange} required />
+            </div>
           </div>
-          <div className="mb-3">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>IFSC Code</label>
-            <input type="text" name="ifscCode" value={ifscCode} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter IFSC code" onChange={handleOnChange} required />
+          <div className="auth-field">
+            <label>Bank Name</label>
+            <input type="text" name="bankName" value={bankName} placeholder="Enter bank name" onChange={handleOnChange} required />
           </div>
-          <div className="mb-4">
-            <label className="form-label" style={{ fontWeight: "500", color: "#4a4a4a" }}>Bank Name</label>
-            <input type="text" name="bankName" value={bankName} className="form-control shadow-none" style={{ borderRadius: "8px", padding: "10px" }} placeholder="Enter bank name" onChange={handleOnChange} required />
-          </div>
-          <button type="submit" className="btn btn-primary w-100 py-2 mb-3" style={{ borderRadius: "8px", fontWeight: "600", backgroundColor: "#0052fe", border: "none" }}>
+          <button type="submit" className="auth-submit">
             Sign Up
           </button>
           
-          <div className="d-flex justify-content-center mb-3">
+          <div className="auth-google">
+            <span>or continue with Google</span>
             <GoogleLogin
               onSuccess={async (credentialResponse) => {
                 try {
@@ -155,7 +163,7 @@ const Signup = () => {
                     }
                     handleSuccess(data.message);
                     setTimeout(() => {
-                      window.location.href = `http://localhost:3001/?token=${data.token || ""}`;
+                      window.location.href = `${DASHBOARD_URL}/?token=${data.token || ""}`;
                     }, 1000);
                   } else {
                     handleError(data.message);
@@ -172,16 +180,14 @@ const Signup = () => {
             />
           </div>
 
-
-          <div className="text-center">
-             <span style={{ color: "#666" }}>Already have an account? <Link to={"/login"} style={{ textDecoration: "none", fontWeight: "600", color: "#0052fe" }}>Login</Link></span>
+          <div className="auth-switch">
+             <span>Already have an account? <Link to={"/login"}>Login</Link></span>
           </div>
         </form>
       </div>
-      <ToastContainer />
+      <ToastContainer toastClassName="auth-toast" />
     </div>
   );
 };
 
-
-export default Signup;
+export default Signup;

@@ -2,6 +2,8 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 
+const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3001";
+
 function Navbar() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token") || Cookies.get("token");
@@ -51,7 +53,7 @@ function Navbar() {
             ) : (
               <>
                 <li className="nav-item">
-                  <a className="nav-link" href={`http://localhost:3001/?token=${token}`}>Dashboard</a>
+                  <a className="nav-link" href={token ? `${DASHBOARD_URL}/?token=${token}` : DASHBOARD_URL}>Dashboard</a>
                 </li>
 
                 <li className="nav-item">
