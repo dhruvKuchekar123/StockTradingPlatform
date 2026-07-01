@@ -11,22 +11,22 @@ module.exports.userVerification = (req, res, next) => {
     }
   }
   if (!token) {
-    return res.json({ status: false, message: "No token provided" });
+    return res.status(401).json({ status: false, message: "Authentication required" });
   }
   jwt.verify(token, process.env.TOKEN_KEY, async (err, data) => {
     if (err) {
-      return res.json({ status: false, message: "Token verification failed" });
+      return res.status(401).json({ status: false, message: "Invalid or expired token" });
+    }
+    const user = await User.findById(data.id).select("-password -signupOTP -resetPasswordToken -verificationToken");
+    if (user) {
+      req.user = user;
+      next();
     } else {
-      const user = await User.findById(data.id);
-      if (user) {
-        req.user = user;
-        next();
-      } else {
-        return res.json({ status: false, message: "User not found" });
-      }
+      return res.status(401).json({ status: false, message: "User not found" });
     }
   });
 };
+
 
 module.exports.adminVerification = (req, res, next) => {
   let token = req.cookies.token;

@@ -50,8 +50,8 @@ async function runBrowserTest() {
 
   try {
     // 1. Signup Page
-    console.log("1. Navigating to signup page (http://localhost:3000/signup)...");
-    await page.goto("http://localhost:3000/signup", { waitUntil: "load" });
+    console.log("1. Navigating to signup page (http://localhost:3005/signup)...");
+    await page.goto("http://localhost:3005/signup", { waitUntil: "load" });
     
     // Wait for signup form elements to render
     await page.waitForSelector('input[name="email"]');
@@ -85,15 +85,15 @@ async function runBrowserTest() {
     console.log("SUCCESS: Retrieved verification token from DB:", user.verificationToken);
 
     // 3. Verify Email
-    console.log(`3. Simulating email verification link (http://localhost:3000/verify-email/${user.verificationToken})...`);
-    await page.goto(`http://localhost:3000/verify-email/${user.verificationToken}`, { waitUntil: "load" });
+    console.log(`3. Simulating email verification link (http://localhost:3005/verify-email/${user.verificationToken})...`);
+    await page.goto(`http://localhost:3005/verify-email/${user.verificationToken}`, { waitUntil: "load" });
     await new Promise(r => setTimeout(r, 2500));
     await page.screenshot({ path: screenshotPath("3_email_verified") });
     console.log("SUCCESS: Email verification page completed successfully.");
 
     // 4. Log in before Approval
     console.log("4. Attempting to log in as unapproved user...");
-    await page.goto("http://localhost:3000/login", { waitUntil: "load" });
+    await page.goto("http://localhost:3005/login", { waitUntil: "load" });
     
     await page.waitForSelector('input[name="email"]');
     await page.type('input[name="email"]', "browseruser@gmail.com");
@@ -111,7 +111,7 @@ async function runBrowserTest() {
 
     // 5. Log in as Admin
     console.log("5. Logging in as admin...");
-    await page.goto("http://localhost:3000/login", { waitUntil: "load" });
+    await page.goto("http://localhost:3005/login", { waitUntil: "load" });
     
     await page.waitForSelector('input[name="email"]');
     await page.type('input[name="email"]', "admin@gmail.com");
@@ -168,7 +168,7 @@ async function runBrowserTest() {
     
     // 8. Log in as approved user
     console.log("8. Logging in as the newly approved user...");
-    await page.goto("http://localhost:3000/login", { waitUntil: "load" });
+    await page.goto("http://localhost:3005/login", { waitUntil: "load" });
     
     await page.waitForSelector('input[name="email"]');
     await page.type('input[name="email"]', "browseruser@gmail.com");

@@ -40,8 +40,8 @@ async function testVerifyBuyFlow() {
         console.log(`Generated mock payment ID: ${paymentId}`);
         console.log(`Generated expected signature: ${expectedSign}`);
 
-        // 4. Send verify-and-buy request
-        const verifyRes = await axios.post("http://localhost:3002/api/payments/verify-and-buy", {
+        // 4. Send verify request
+        const verifyRes = await axios.post("http://localhost:3002/api/payments/verify", {
             razorpay_order_id: order.id,
             razorpay_payment_id: paymentId,
             razorpay_signature: expectedSign,

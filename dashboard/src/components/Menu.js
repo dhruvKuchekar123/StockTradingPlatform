@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import axios from "axios";
+import { Badge } from "@mui/material";
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -10,43 +12,83 @@ import {
   LogOut,
   User as UserIcon,
   Shield,
-  ChevronDown
+  ChevronDown,
+  Newspaper,
+  Brain
 } from "lucide-react";
 
 const Menu = ({ username }) => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [openOrderCount, setOpenOrderCount] = useState(0);
   const location = useLocation();
 
+  useEffect(() => {
+    const fetchOpenOrders = async () => {
+      try {
+        const res = await axios.get("http://localhost:3002/api/orders/open", { withCredentials: true });
+        if (res.data.success) {
+          setOpenOrderCount(res.data.orders.length);
+        }
+      } catch (e) {
+        console.error("Failed to fetch open orders count");
+      }
+    };
+    fetchOpenOrders();
+  }, []);
+
   const handleLogout = () => {
-    document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    // 1. Clear client-side storage FIRST (synchronous, instant)
     localStorage.removeItem("token");
-    window.location.href = "http://localhost:3000/login";
+    localStorage.removeItem("sf_onboarding_done"); // Reset tour if desired
+    document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    sessionStorage.clear();
+
+    // 2. Fire-and-forget backend cookie clear (don't await — redirect immediately)
+    try {
+      fetch("http://localhost:3002/logout", {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {}); // Silently ignore network errors
+    } catch (_) {}
+
+    // 3. Redirect to login with logout=true flag so Login.js won't auto-redirect back
+    window.location.replace(
+      `${process.env.REACT_APP_FRONTEND_URL || "http://localhost:3005"}/login?logout=true`
+    );
   };
 
   const menuItems = [
-    { name: "Dashboard", path: "/", icon: LayoutDashboard },
-    { name: "Orders", path: "/orders", icon: ShoppingBag },
-    { name: "Holdings", path: "/holdings", icon: BarChart2 },
-    { name: "Positions", path: "/positions", icon: Briefcase },
-    { name: "Funds", path: "/funds", icon: CreditCard },
-    { name: "Analytics", path: "/analytics", icon: Layers },
-
+    { name: "Dashboard", path: "/", icon: LayoutDashboard, id: "menu-dashboard" },
+    { name: "Orders", path: "/orders", icon: ShoppingBag, badge: openOrderCount, id: "menu-orders" },
+    { name: "Holdings", path: "/holdings", icon: BarChart2, id: "menu-holdings" },
+    { name: "Positions", path: "/positions", icon: Briefcase, id: "menu-positions" },
+    { name: "Funds", path: "/funds", icon: CreditCard, id: "menu-funds" },
+    { name: "Analytics", path: "/analytics", icon: Layers, id: "menu-analytics" },
+    { name: "News", path: "/news", icon: Newspaper, id: "menu-news" },
+    { name: "AI", path: "/ai-insights", icon: Brain, id: "menu-ai" },
   ];
 
   return (
-    <div className="flex items-center gap-8">
+    <div className="flex items-center gap-4">
       <nav>
-        <ul className="flex items-center gap-1 list-none m-0 p-0">
+        <ul className="menu-container">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
             return (
-              <li key={item.name}>
+              <li key={item.name} style={{ listStyle: "none" }}>
                 <Link
                   to={item.path}
-                  className={`menu-item flex items-center gap-2 ${isActive ? 'active text-cyan-400' : ''}`}
+                  id={item.id}
+                  className={`menu-item ${isActive ? 'active' : ''}`}
                 >
-                  <Icon size={16} />
+                  {item.badge > 0 ? (
+                    <Badge badgeContent={item.badge} color="error" overlap="circular">
+                      <Icon size={15} />
+                    </Badge>
+                  ) : (
+                    <Icon size={15} />
+                  )}
                   <span>{item.name}</span>
                 </Link>
               </li>
@@ -57,43 +99,52 @@ const Menu = ({ username }) => {
 
       <div className="relative">
         <div 
-          className="flex items-center gap-3 cursor-pointer p-1.5 hover:bg-white/5 rounded-xl transition-all"
+          className="profile-trigger"
           onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/20">
+          <div className="profile-avatar">
             {username ? username.charAt(0).toUpperCase() : "U"}
           </div>
           <div className="hidden md:block">
-            <p className="text-xs font-bold text-white m-0 leading-none">{username || "User"}</p>
-            <p className="text-[10px] text-cyan-400/70 m-0 mt-1">Pro Account</p>
+            <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-main)", margin: 0, lineHeight: 1 }}>
+              {username || "User"}
+            </p>
+            <p style={{ fontSize: "10px", color: "var(--accent-gold)", margin: "3px 0 0 0", opacity: 0.8 }}>
+              Pro Account
+            </p>
           </div>
-          <ChevronDown size={14} className={`text-dim transition-transform ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown 
+            size={13} 
+            style={{ 
+              color: "var(--text-dim)", 
+              transition: "transform 0.2s", 
+              transform: isProfileDropdownOpen ? "rotate(180deg)" : "none" 
+            }} 
+          />
         </div>
 
         {isProfileDropdownOpen && (
-          <div className="absolute top-full right-0 mt-2 w-48 bg-[#0f111a] border border-border rounded-xl shadow-2xl p-2 z-[1000] animate-in fade-in slide-in-from-top-2">
+          <div className="profile-dropdown">
             <Link 
               to="/profile" 
-              className="flex items-center gap-3 p-3 text-sm text-dim hover:text-white hover:bg-white/5 rounded-lg transition-all"
               onClick={() => setIsProfileDropdownOpen(false)}
             >
-              <UserIcon size={16} />
+              <UserIcon size={15} />
               My Profile
             </Link>
             <Link 
               to="/admin" 
-              className="flex items-center gap-3 p-3 text-sm text-dim hover:text-white hover:bg-white/5 rounded-lg transition-all"
               onClick={() => setIsProfileDropdownOpen(false)}
             >
-              <Shield size={16} />
+              <Shield size={15} />
               Admin Panel
             </Link>
-            <div className="h-px bg-border my-1" />
+            <div className="dropdown-divider" />
             <button 
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 p-3 text-sm text-red-400 hover:bg-red-400/10 rounded-lg transition-all border-none bg-transparent cursor-pointer"
+              className="logout-btn"
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
               Log Out
             </button>
           </div>

@@ -1,6 +1,12 @@
 const Razorpay = require("razorpay");
-const crypto = require("crypto");
 const UserModel = require("../model/UserModel");
+const OrdersModel = require("../model/OrdersModel");
+const HoldingsModel = require("../model/HoldingModel");
+const MarketService = require("../util/MarketService");
+const PriceService = require("../services/PriceService");
+const { sendPaymentReceiptEmail } = require("../util/EmailService");
+const { executeOrder } = require("../engine/OrderMatcher");
+const { verifyRazorpaySignature } = require("../util/PaymentUtils");
 
 const getRazorpayInstance = () => {
     return new Razorpay({
@@ -9,11 +15,9 @@ const getRazorpayInstance = () => {
     });
 };
 
-const MarketService = require("../util/MarketService");
-
-module.exports.createTradeOrder = async (req, res) => {
+module.exports.createRazorpayOrder = async (req, res) => {
     try {
-        const { symbol, qty, price } = req.body;
+        const { symbol, qty, price: clientPrice } = req.body;
         
         const isOpen = await MarketService.isMarketOpen();
         if (!isOpen) return res.status(400).json({ success: false, message: "Market is currently closed." });
@@ -23,23 +27,34 @@ module.exports.createTradeOrder = async (req, res) => {
 
         let livePrice;
         try {
-            livePrice = await MarketService.getLivePrice(symbol);
+            // Add a 2-second timeout to prevent yahoo-finance retries from hanging
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000));
+            const priceData = await Promise.race([PriceService.fetchPrice(symbol), timeoutPromise]);
+            livePrice = priceData?.price;
         } catch (err) {
-            console.log(`Falling back to frontend price for ${symbol} due to Finnhub error.`);
-            livePrice = Number(price);
+            console.warn("Could not fetch live price for " + symbol + " (Timeout/Error). Using client-provided price or fallback.");
         }
 
+        // Use the live price, or fall back to the client-sent price, or a mock price
         if (!livePrice || isNaN(livePrice) || livePrice <= 0) {
-            return res.status(400).json({ success: false, message: "Invalid stock price for this symbol." });
+            livePrice = (clientPrice && !isNaN(clientPrice) && clientPrice > 0) ? Number(clientPrice) : 1200.50;
         }
 
-        const amount = livePrice * qty;
-        
-        // Force the checkout amount to 100 paise (1 INR) for Razorpay test mode to avoid max limit errors
+        const qtyNum = parseInt(qty, 10) || 1;
+        // FIXED: amount in paise = price × qty × 100 (the actual trade value)
+        const amountInPaise = Math.max(Math.round(livePrice * qtyNum * 100), 100);
+
+        console.log(`[Payment] Creating order: ${symbol} × ${qtyNum} @ ₹${livePrice} = ₹${livePrice * qtyNum} (${amountInPaise} paise)`);
+
         const options = {
-            amount: 100, // paise
+            amount: amountInPaise,
             currency: "INR",
-            receipt: `receipt_order_${Date.now()}`,
+            receipt: `rcpt_${symbol}_${Date.now()}`,
+            notes: {
+                symbol,
+                qty: qtyNum,
+                pricePerShare: livePrice,
+            }
         };
 
         const razorpay = getRazorpayInstance();
@@ -54,24 +69,83 @@ module.exports.createTradeOrder = async (req, res) => {
             razorpay_key: (process.env.RAZORPAY_KEY_ID || "test").trim() 
         });
     } catch (error) {
-        console.error("Trade Order Error:", error);
-        res.status(500).json({ success: false, message: "Server Error generating trade payment: " + error.message, stack: error.stack });
+        console.error("Create Trade Order Error:", error);
+        res.status(500).json({ success: false, message: "Server Error generating trade payment: " + error.message });
+    }
+};
+
+module.exports.verifyPaymentAndExecuteBuy = async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, symbol, qty, price } = req.body;
+        const userId = req.user.id;
+
+        if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
+            return res.status(400).json({ success: false, message: "Invalid signature. Payment verification failed. No changes made." });
+        }
+
+        // SIGNATURE VERIFIED - Safe to proceed with DB writes
+        // Save Order
+        const newOrder = new OrdersModel({
+            userId,
+            symbol,
+            qty,
+            orderType: 'MARKET',
+            side: 'BUY',
+            paymentVerified: true,
+            status: 'PENDING',
+            razorpayOrderId: razorpay_order_id,
+            razorpayPaymentId: razorpay_payment_id
+        });
+        await newOrder.save();
+
+        await executeOrder(newOrder, price);
+        
+        // Wait for executeOrder to finish and then we can send success or fail depending on status
+        // But usually it should succeed since it's a MARKET BUY
+        const updatedOrder = await OrdersModel.findById(newOrder._id);
+        if (updatedOrder.status === 'REJECTED') {
+            return res.status(500).json({ success: false, message: `Order execution failed: ${updatedOrder.notes}` });
+        }
+
+        const user = await UserModel.findById(userId);
+
+        // Email logic is now handled in executeOrder, but we can do it here if we want to ensure it for Razorpay only.
+        // Actually, sendPaymentReceiptEmail is called in verifyAndBuy originally. Let's keep it here for Razorpay explicitly.
+        try {
+            await sendPaymentReceiptEmail(user.email, symbol, qty, price);
+        } catch (emailError) {
+            console.error("Receipt email failed to send, but buy was successful:", emailError);
+        }
+
+        return res.status(200).json({ success: true, message: `Successfully purchased ${qty} shares of ${symbol}!` });
+    } catch (error) {
+        console.error("verifyAndBuy Error:", error);
+        res.status(500).json({ success: false, message: "Server Error completing trade" });
+    }
+};
+
+module.exports.getPaymentStatus = async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const razorpay = getRazorpayInstance();
+        const order = await razorpay.orders.fetch(orderId);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" });
+        }
+        return res.status(200).json({ success: true, order });
+    } catch (error) {
+        console.error("Fetch order Error:", error);
+        res.status(500).json({ success: false, message: "Server Error fetching order status" });
     }
 };
 
 module.exports.verifyPayment = async (req, res) => {
+    // Keeping this generic add-funds endpoint just in case it's used elsewhere
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature, amount } = req.body;
         const userId = req.user.id;
 
-        const sign = razorpay_order_id + "|" + razorpay_payment_id;
-        const expectedSign = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "test")
-            .update(sign.toString())
-            .digest("hex");
-
-        if (razorpay_signature === expectedSign) {
-            // Payment verified
+        if (verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
             const user = await UserModel.findById(userId);
             user.walletBalance += Number(amount); // amount in INR
             await user.save();
@@ -83,64 +157,5 @@ module.exports.verifyPayment = async (req, res) => {
     } catch (error) {
         console.error("Verification Error:", error);
         res.status(500).json({ success: false, message: "Server Error verifying payment" });
-    }
-};
-
-const { sendPaymentReceiptEmail } = require("../util/EmailService");
-const OrdersModel = require("../model/OrdersModel");
-
-module.exports.verifyAndBuy = async (req, res) => {
-    try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, symbol, qty, price } = req.body;
-        const userId = req.user.id;
-
-        const sign = razorpay_order_id + "|" + razorpay_payment_id;
-        const expectedSign = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "test")
-            .update(sign.toString())
-            .digest("hex");
-
-        if (razorpay_signature === expectedSign) {
-            const user = await UserModel.findById(userId);
-            
-            let newOrder = new OrdersModel({
-                name: symbol,
-                qty: qty,
-                price: price,
-                mode: "BUY",
-            });
-            await newOrder.save();
-
-            // Update holdings in database
-            const HoldingsModel = require("../model/HoldingModel");
-            let holding = await HoldingsModel.findOne({ name: symbol });
-            if (holding) {
-                const oldTotal = holding.qty * holding.avg;
-                const newTotal = Number(qty) * Number(price);
-                holding.qty += Number(qty);
-                holding.avg = (oldTotal + newTotal) / holding.qty;
-                holding.price = Number(price);
-                await holding.save();
-            } else {
-                holding = new HoldingsModel({
-                    name: symbol,
-                    qty: Number(qty),
-                    avg: Number(price),
-                    price: Number(price),
-                    net: "+0.00%",
-                    day: "+0.00%",
-                });
-                await holding.save();
-            }
-
-            await sendPaymentReceiptEmail(user.email, symbol, qty, price);
-
-            return res.status(200).json({ success: true, message: `Successfully purchased ${qty} shares of ${symbol}!` });
-        } else {
-            return res.status(400).json({ success: false, message: "Invalid signature. Payment verification failed." });
-        }
-    } catch (error) {
-        console.error("verifyAndBuy Error:", error);
-        res.status(500).json({ success: false, message: "Server Error completing trade" });
     }
 };

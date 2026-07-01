@@ -23,8 +23,8 @@ async function run() {
   });
 
   try {
-    console.log("Navigating to http://localhost:3000/signup...");
-    await page.goto("http://localhost:3000/signup", { waitUntil: "load" });
+    console.log("Navigating to http://localhost:3005/signup...");
+    await page.goto("http://localhost:3005/signup", { waitUntil: "load" });
     
     console.log("Waiting 5 seconds...");
     await new Promise(r => setTimeout(r, 5000));

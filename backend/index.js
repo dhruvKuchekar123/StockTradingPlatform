@@ -4,6 +4,9 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const { createServer } = require("http");
+const { initPriceSocket } = require("./websocket/PriceSocket");
+const { startPoller } = require("./jobs/PricePoller");
 
 const HoldingsModel = require("./model/HoldingModel");
 const PositionsModel = require("./model/PositionsModel");
@@ -18,6 +21,12 @@ const authRoute = require("./Routes/AuthRoute");
 const paymentRoute = require("./Routes/PaymentRoute");
 const adminRoute = require("./Routes/AdminRoute");
 const marketRoute = require("./Routes/MarketRoute");
+const sellRoute = require("./Routes/SellRoute");
+const portfolioRoute = require("./Routes/PortfolioRoute");
+const orderRoute = require("./Routes/OrderRoute");
+const walletRoute = require("./Routes/WalletRoute");
+const webhookRoute = require("./Routes/WebhookRoute");
+const { startGTTExpiryJob } = require("./jobs/GTTExpiryJob");
 
 const app = express();
 
@@ -29,8 +38,10 @@ app.use(
     origin: [
       "http://localhost:3000", 
       "http://localhost:3001",
+      "http://localhost:3005",
       "http://127.0.0.1:3000",
-      "http://127.0.0.1:3001"
+      "http://127.0.0.1:3001",
+      "http://127.0.0.1:3005"
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
@@ -38,12 +49,21 @@ app.use(
 );
 
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 app.use("/", authRoute);
 app.use("/api/payments", paymentRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/market", marketRoute);
+app.use("/api/sell", sellRoute);
+app.use("/api/portfolio", portfolioRoute);
+app.use("/api/orders", orderRoute);
+app.use("/api/wallet", walletRoute);
+app.use("/api/webhooks", webhookRoute);
 
 app.get("/allHoldings", async (req, res) => {
   let allHoldings = await HoldingsModel.find();
@@ -69,102 +89,18 @@ app.get("/api/user/profile", userVerification, async (req, res) => {
     }
 });
 
-app.post("/newOrder", userVerification, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const user = await UserModel.findById(userId);
+// The /newOrder route was removed and split into /api/payments/verify and /api/sell/execute
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
-    }
+const httpServer = createServer(app);
+initPriceSocket(httpServer);
 
-    if (!user.isApproved && user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Your account is pending admin approval." });
-    }
-
-    const isOpen = await MarketService.isMarketOpen();
-    if (!isOpen) {
-      return res.status(400).json({ success: false, message: "Market is currently closed." });
-    }
-
-    const { name: symbol, qty, mode } = req.body; 
-
-    // Fetch live price securely from backend
-    const livePrice = await MarketService.getLivePrice(symbol);
-    const totalCost = livePrice * qty;
-
-    if (mode === "BUY") {
-      if (user.walletBalance < totalCost) {
-        return res.status(400).json({ success: false, message: "Insufficient wallet balance." });
-      }
-      user.walletBalance -= totalCost;
-      await user.save();
-
-      // Add to holdings
-      let holding = await HoldingsModel.findOne({ name: symbol });
-      if (holding) {
-        const oldTotal = holding.qty * holding.avg;
-        const newTotal = Number(qty) * Number(livePrice);
-        holding.qty += Number(qty);
-        holding.avg = (oldTotal + newTotal) / holding.qty;
-        holding.price = Number(livePrice);
-        await holding.save();
-      } else {
-        holding = new HoldingsModel({
-          name: symbol,
-          qty: Number(qty),
-          avg: Number(livePrice),
-          price: Number(livePrice),
-          net: "+0.00%",
-          day: "+0.00%",
-        });
-        await holding.save();
-      }
-    } else if (mode === "SELL") {
-      // Deduct from holdings
-      let holding = await HoldingsModel.findOne({ name: symbol });
-      if (!holding || holding.qty < Number(qty)) {
-        return res.status(400).json({ success: false, message: `You do not own enough shares of ${symbol} to sell.` });
-      }
-
-      holding.qty -= Number(qty);
-      if (holding.qty <= 0) {
-        await HoldingsModel.deleteOne({ _id: holding._id });
-      } else {
-        await holding.save();
-      }
-
-      user.walletBalance += totalCost;
-      await user.save();
-
-      // Send Sell Email Notification
-      const { sendSellReceiptEmail } = require("./util/EmailService");
-      try {
-        await sendSellReceiptEmail(user.email, symbol, qty, livePrice);
-      } catch (e) {
-        console.error("Sell email failed:", e);
-      }
-    }
-
-    let newOrder = new OrdersModel({
-      name: symbol,
-      qty: qty,
-      price: livePrice,
-      mode: mode,
-    });
-
-    await newOrder.save();
-
-    res.json({ success: true, message: `Order executed successfully at $${livePrice.toFixed(2)}` });
-  } catch(error) {
-    console.error("Order Execution Error:", error.message);
-    res.status(500).json({ success: false, message: "Failed to execute order. Check symbol validity." });
-  }
-});
-
-
-app.listen(PORT, () => {
-  console.log("App started!");
-  mongoose.connect(uri);
-  console.log("DB started!");
+httpServer.listen(PORT, () => {
+  console.log("App started on port " + PORT + "!");
+  mongoose.connect(uri).then(() => {
+    console.log("DB started!");
+    startPoller();
+    startGTTExpiryJob();
+  }).catch(err => {
+    console.error("DB Connection Error:", err);
+  });
 });

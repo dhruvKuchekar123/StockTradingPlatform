@@ -11,14 +11,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, "Your username is required"],
   },
+  isPublic: {
+    type: Boolean,
+    default: false,
+  },
   password: {
     type: String,
     required: [true, "Your password is required"],
   },
   createdAt: {
     type: Date,
-    default: new Date(),
+    default: Date.now, // Function reference, not a value — evaluated at document creation time
   },
+
   isVerified: {
     type: Boolean,
     default: false,
@@ -57,6 +62,10 @@ const userSchema = new mongoose.Schema({
   verificationToken: String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  signupOTP: String,
+  signupOTPExpires: Date,
+  otpAttempts: { type: Number, default: 0 }, // Tracks failed OTP attempts for brute-force protection
+
 });
 
 

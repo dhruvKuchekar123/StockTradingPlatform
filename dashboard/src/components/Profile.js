@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || "http://localhost:3005";
+
 const Profile = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +22,7 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     try {
-      const { data } = await axios.get("http://localhost:3002/profile", {
+      const { data } = await axios.get(`${API_URL}/profile`, {
         withCredentials: true,
       });
       if (data.success) {
@@ -47,7 +50,7 @@ const Profile = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const { data } = await axios.put("http://localhost:3002/profile", formData, {
+      const { data } = await axios.put(`${API_URL}/profile`, formData, {
         withCredentials: true,
       });
       if (data.success) {
@@ -131,7 +134,7 @@ const Profile = () => {
           </div>
         )}
         
-        <button onClick={() => window.location.href = "http://localhost:3000"} style={styles.backBtn}>
+        <button onClick={() => window.location.href = FRONTEND_URL} style={styles.backBtn}>
           Back to Main Website
         </button>
       </div>

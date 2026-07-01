@@ -3,34 +3,49 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 400px;
-  background-color: #0f111a;
-  border: 1px solid #1e2235;
-  border-radius: 16px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  width: 420px;
+  background: rgba(22, 27, 34, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   z-index: 2000;
   overflow: hidden;
-  animation: modalFadeIn 0.3s ease-out;
+  animation: modalSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes modalFadeIn {
-  from { opacity: 0; transform: translate(-50%, -45%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .buy-window-header {
-  padding: 20px;
-  background: linear-gradient(90deg, #0052fe, #00f2ff);
-  color: white;
+  padding: 20px 24px;
+  background: linear-gradient(90deg, #D4AF37, #E8C547);
+  color: #0F1117;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
+.buy-window-header.sell-mode {
+  background: linear-gradient(90deg, #EF4444, #F87171);
+  color: white;
+}
+
 .buy-window-header h3 {
   margin: 0;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .buy-window-content {
@@ -43,27 +58,30 @@
 
 .input-group label {
   display: block;
-  font-size: 12px;
-  color: #a0a0a0;
+  font-size: 11px;
+  color: #8B95A5;
   margin-bottom: 8px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.1em;
+  font-weight: 600;
 }
 
 .buy-input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid #1e2235;
-  border-radius: 8px;
-  padding: 12px;
-  color: white;
-  font-size: 16px;
-  transition: border-color 0.2s;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #2A3040;
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #F0F4F8;
+  font-size: 15px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.2s ease;
+  outline: none;
 }
 
 .buy-input:focus {
-  outline: none;
-  border-color: #00f2ff;
+  border-color: #D4AF37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08);
 }
 
 .buy-window-footer {
@@ -72,17 +90,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid #1e2235;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .margin-info {
   font-size: 12px;
-  color: #a0a0a0;
+  color: #8B95A5;
 }
 
 .margin-info span {
-  color: #00f2ff;
-  font-weight: 600;
+  color: #D4AF37;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .btn-group {
@@ -91,32 +110,38 @@
 }
 
 .btn-buy-confirm {
-  background: #0052fe;
-  color: white;
+  background: linear-gradient(135deg, #D4AF37, #C49B2A);
+  color: #0F1117;
   border: none;
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-weight: 600;
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  font-family: 'Inter', sans-serif;
 }
 
 .btn-buy-confirm:hover {
-  background: #0042cc;
-  box-shadow: 0 0 15px rgba(0, 82, 254, 0.4);
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+  transform: translateY(-1px);
 }
 
 .btn-cancel {
   background: transparent;
-  color: #a0a0a0;
-  border: 1px solid #1e2235;
-  padding: 10px 24px;
-  border-radius: 8px;
+  color: #8B95A5;
+  border: 1px solid #2A3040;
+  padding: 12px 28px;
+  border-radius: 10px;
   font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
 }
 
 .btn-cancel:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #3A4050;
+  color: #F0F4F8;
 }

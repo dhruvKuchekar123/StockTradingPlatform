@@ -9,7 +9,7 @@ const VerifyEmail = () => {
   useEffect(() => {
     const verify = async () => {
       try {
-        const { data } = await axios.post(`http://localhost:3002/verify-email/${token}`);
+        const { data } = await axios.post(`${process.env.REACT_APP_API_URL || "http://localhost:3002"}/verify-email/${token}`);
         if (data.success) {
           setStatus("success");
         } else {

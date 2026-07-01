@@ -1,16 +1,33 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Tabs, Tab } from "@mui/material";
+import OpenOrders from "./OpenOrders";
+import OrderHistory from "./OrderHistory";
 
 const Orders = () => {
-  return (
-    <div className="orders">
-      <div className="no-orders">
-        <p>You haven't placed any orders today</p>
+  const [tabIndex, setTabIndex] = useState(0);
 
-        <Link to={"/"} className="btn">
-          Get started
-        </Link>
-      </div>
+  const handleTabChange = (event, newValue) => {
+    setTabIndex(newValue);
+  };
+
+  return (
+    <div className="orders-container p-6">
+      <h2 className="text-white mb-6">Orders Manager</h2>
+      
+      <Tabs 
+        value={tabIndex} 
+        onChange={handleTabChange} 
+        textColor="inherit" 
+        indicatorColor="primary" 
+        className="mb-6"
+        sx={{ color: '#fff', '& .MuiTab-root': { color: '#aaa' }, '& .Mui-selected': { color: '#fff' } }}
+      >
+        <Tab label="Open Orders" />
+        <Tab label="Order History" />
+      </Tabs>
+
+      {tabIndex === 0 && <OpenOrders />}
+      {tabIndex === 1 && <OrderHistory />}
     </div>
   );
 };

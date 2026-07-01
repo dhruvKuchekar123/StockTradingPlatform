@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { GoogleLogin } from '@react-oauth/google';
 import "./Auth.css";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
 const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3001";
 
 const Login = () => {
@@ -15,17 +16,46 @@ const Login = () => {
     email: "",
     password: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
   const { email, password } = inputValue;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    const isLogout = params.get("logout") === "true";
     const errorMsg = params.get("message");
-    if (errorMsg) {
-      toast.error(decodeURIComponent(errorMsg), {
-        position: "bottom-left",
-      });
-      // Clear URL query parameters so the message doesn't persist on refresh
+
+    // If user just logged out, clear any remaining tokens and do NOT auto-redirect
+    if (isLogout) {
+      localStorage.removeItem("token");
+      sessionStorage.clear();
+      document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      toast.success("You have been logged out successfully.", { position: "bottom-left" });
+      // Remove the query param from URL
       navigate(location.pathname, { replace: true });
+      return;
+    }
+
+    // Show error messages from URL (e.g. from 401 auto-logout)
+    if (errorMsg) {
+      toast.error(decodeURIComponent(errorMsg), { position: "bottom-left" });
+      navigate(location.pathname, { replace: true });
+    }
+
+    // If user already has a valid token, skip login and go to dashboard
+    const existingToken = localStorage.getItem("token");
+    if (existingToken) {
+      axios.post(`${API_URL}/`, {}, {
+        headers: { Authorization: `Bearer ${existingToken}` },
+        withCredentials: true,
+      }).then(({ data }) => {
+        if (data.status) {
+          window.location.href = `${DASHBOARD_URL}/?token=${existingToken}`;
+        } else {
+          localStorage.removeItem("token");
+        }
+      }).catch(() => {
+        localStorage.removeItem("token");
+      });
     }
   }, [location, navigate]);
 
@@ -48,9 +78,10 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
       const { data } = await axios.post(
-        "http://localhost:3002/login",
+        `${API_URL}/login`,
         {
           ...inputValue,
         },
@@ -65,12 +96,14 @@ const Login = () => {
         setTimeout(() => {
           window.location.href = `${DASHBOARD_URL}/?token=${data.token || ""}`;
         }, 1000);
-
       } else {
         handleError(message);
+        setIsLoading(false);
       }
     } catch (error) {
       console.log(error);
+      handleError("Login failed. Please check your credentials.");
+      setIsLoading(false);
     }
     setInputValue({
       ...inputValue,
@@ -114,8 +147,8 @@ const Login = () => {
               required
             />
           </div>
-          <button type="submit" className="auth-submit">
-            Login
+          <button type="submit" className="auth-submit" disabled={isLoading}>
+            {isLoading ? "Signing in..." : "Login"}
           </button>
           
           <div className="auth-link-row">
@@ -128,7 +161,7 @@ const Login = () => {
               onSuccess={async (credentialResponse) => {
                 try {
                   const { data } = await axios.post(
-                    "http://localhost:3002/google-login",
+                    `${API_URL}/google-login`,
                     { token: credentialResponse.credential },
                     { withCredentials: true }
                   );
@@ -153,7 +186,6 @@ const Login = () => {
                 handleError("Google Login Failed");
               }}
             />
-
           </div>
 
           <div className="auth-switch">
@@ -165,6 +197,5 @@ const Login = () => {
     </div>
   );
 };
-
 
 export default Login;

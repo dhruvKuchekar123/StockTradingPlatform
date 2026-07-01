@@ -1,0 +1,67 @@
+const EventEmitter = require("events");
+const HoldingsModel = require("../model/HoldingModel");
+const PriceService = require("../services/PriceService");
+const CacheService = require("../services/CacheService");
+
+class PriceEmitter extends EventEmitter {}
+const priceEmitter = new PriceEmitter();
+
+let activeSymbols = new Set();
+let intervalId = null;
+
+const fetchAndBroadcast = async () => {
+    if (activeSymbols.size === 0) return;
+
+    try {
+        const symbolsArray = Array.from(activeSymbols);
+        const results = await PriceService.fetchPrices(symbolsArray);
+        
+        const updatePayload = {};
+        for (const data of results) {
+            await CacheService.setPrice(data.symbol, data);
+            updatePayload[data.symbol] = data;
+        }
+
+        if (Object.keys(updatePayload).length > 0) {
+            priceEmitter.emit("price:update", updatePayload);
+            console.log(`[Poller] Updated ${Object.keys(updatePayload).length} symbols at ${new Date().toISOString()}`);
+        }
+    } catch (err) {
+        console.error("[Poller] Error fetching prices:", err.message);
+    }
+};
+
+module.exports.startPoller = async () => {
+    if (intervalId) return;
+
+    // Load initial symbols from DB
+    try {
+        const dbSymbols = await HoldingsModel.distinct("name");
+        dbSymbols.forEach(s => activeSymbols.add(s));
+        console.log(`[Poller] Loaded ${dbSymbols.length} symbols from Holdings.`);
+    } catch (err) {
+        console.error("[Poller] Error loading initial symbols:", err.message);
+    }
+
+    fetchAndBroadcast(); // immediate first fetch
+    intervalId = setInterval(fetchAndBroadcast, 15000);
+    console.log("[Poller] Price poller started (15s interval)");
+};
+
+module.exports.stopPoller = () => {
+    if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+        console.log("[Poller] Price poller stopped.");
+    }
+};
+
+module.exports.addSymbol = (symbol) => {
+    activeSymbols.add(symbol);
+};
+
+module.exports.removeSymbol = (symbol) => {
+    activeSymbols.delete(symbol);
+};
+
+module.exports.priceEmitter = priceEmitter;
