@@ -41,6 +41,15 @@ const userSchema = new mongoose.Schema({
     enum: ["user", "admin"],
     default: "user",
   },
+  plan: {
+    type: String,
+    enum: ["BASIC", "PRO", "PREMIUM"],
+    default: "BASIC",
+  },
+  lastLogin: {
+    type: Date,
+    default: null,
+  },
   bankDetails: {
     accountName: { type: String, default: "" },
     accountNumber: { type: String, default: "" },

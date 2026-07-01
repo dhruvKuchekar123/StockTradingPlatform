@@ -76,8 +76,10 @@ module.exports.GoogleLogin = async (req, res, next) => {
       // Linking to a pre-existing account: a verified Google email proves ownership,
       // so promote the account to verified without touching its password.
       user.isVerified = true;
-      await user.save();
     }
+
+    user.lastLogin = new Date();
+    await user.save();
 
     const secretToken = createSecretToken(user._id);
     res.cookie("token", secretToken, {
@@ -423,6 +425,9 @@ module.exports.Login = async (req, res, next) => {
     if (!auth) {
       return res.status(401).json({ success: false, message: "Incorrect password or email" });
     }
+    user.lastLogin = new Date();
+    await user.save();
+
     const token = createSecretToken(user._id);
     res.cookie("token", token, {
       path: "/",

@@ -1,8 +1,14 @@
 const OrdersModel = require("../model/OrdersModel");
 
+// Last time the expiry sweep actually ran (for the admin System Health panel).
+let lastRun = null;
+let lastExpiredCount = 0;
+module.exports.getGTTJobStatus = () => ({ lastRun, lastExpiredCount });
+
 module.exports.startGTTExpiryJob = () => {
     // Run every hour
     setInterval(async () => {
+        lastRun = new Date();
         try {
             const expiredOrders = await OrdersModel.find({
                 orderType: 'GTT',
@@ -22,6 +28,7 @@ module.exports.startGTTExpiryJob = () => {
                         } 
                     }
                 );
+                lastExpiredCount = expiredOrders.length;
                 console.log(`[Job] Expired ${expiredOrders.length} GTT orders`);
             }
         } catch (error) {
