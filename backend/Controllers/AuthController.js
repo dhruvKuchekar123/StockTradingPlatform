@@ -169,17 +169,62 @@ module.exports.Signup = async (req, res, next) => {
       isApproved: true,
     });
 
-    // Send OTP via Email
-    await sendOTPEmail(email, otp);
+    // Send OTP via Email. The account is already created, so a mail failure must
+    // NOT fail signup — instead tell the client the email didn't go out so it can
+    // offer a "Resend OTP" action.
+    const emailSent = await sendOTPEmail(email, otp);
 
     return res.status(201).json({
       success: true,
-      message: "OTP sent to your email. Please verify to continue.",
+      emailSent,
+      message: emailSent
+        ? "OTP sent to your email. Please verify to continue."
+        : "Account created, but we couldn't send the verification email. Please use 'Resend OTP' to try again.",
       email
     });
   } catch (error) {
     console.error("Signup error:", error);
     res.status(500).json({ success: false, message: "Internal server error during signup" });
+  }
+};
+
+module.exports.ResendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    // Case-insensitive match, consistent with the rest of auth.
+    const escaped = String(email).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const user = await User.findOne({ email: { $regex: `^${escaped}$`, $options: "i" } });
+
+    // Do not reveal whether the account exists; respond the same either way.
+    if (!user || user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        emailSent: false,
+        message: "If an unverified account exists for this email, a new OTP has been sent.",
+      });
+    }
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+    user.signupOTP = otp;
+    user.signupOTPExpires = new Date(Date.now() + 600000); // 10 minutes
+    user.otpAttempts = 0;
+    await user.save();
+
+    const emailSent = await sendOTPEmail(user.email, otp);
+    return res.status(200).json({
+      success: true,
+      emailSent,
+      message: emailSent
+        ? "A new verification code has been sent to your email."
+        : "We still couldn't send the email. Please try again shortly.",
+    });
+  } catch (error) {
+    console.error("ResendOTP error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error while resending OTP" });
   }
 };
 

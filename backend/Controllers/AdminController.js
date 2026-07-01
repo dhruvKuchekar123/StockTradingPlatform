@@ -1,4 +1,15 @@
 const UserModel = require("../model/UserModel");
+const { retryFailedEmails } = require("../util/EmailService");
+
+module.exports.retryFailedEmails = async (req, res) => {
+    try {
+        const summary = await retryFailedEmails();
+        res.json({ success: true, ...summary });
+    } catch (error) {
+        console.error("Retry Failed Emails Error:", error);
+        res.status(500).json({ success: false, message: "Error retrying failed emails" });
+    }
+};
 
 module.exports.getPendingUsers = async (req, res) => {
     try {

@@ -1,4 +1,4 @@
-const { Signup, Login, GoogleLogin, VerifyOTP, VerifyEmail, ForgotPassword, ResetPassword, GetProfile, UpdateProfile, Logout } = require("../Controllers/AuthController");
+const { Signup, Login, GoogleLogin, VerifyOTP, ResendOTP, VerifyEmail, ForgotPassword, ResetPassword, GetProfile, UpdateProfile, Logout } = require("../Controllers/AuthController");
 const { userVerification, checkUserStatus } = require("../Middlewares/AuthMiddleware");
 const router = require("express").Router();
 const rateLimit = require("express-rate-limit");
@@ -59,6 +59,7 @@ router.post("/signup", signupLimiter, Signup);
 router.post("/login", loginLimiter, Login);
 router.post("/google-login", loginLimiter, GoogleLogin);
 router.post("/verify-otp", otpLimiter, VerifyOTP);
+router.post("/resend-otp", otpLimiter, ResendOTP);
 router.post("/verify-email/:token", VerifyEmail);
 router.post("/forgot-password", forgotPasswordLimiter, ForgotPassword);
 router.post("/reset-password/:token", ResetPassword);

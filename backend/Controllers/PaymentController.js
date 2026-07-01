@@ -107,15 +107,9 @@ module.exports.verifyPaymentAndExecuteBuy = async (req, res) => {
             return res.status(500).json({ success: false, message: `Order execution failed: ${updatedOrder.notes}` });
         }
 
-        const user = await UserModel.findById(userId);
-
-        // Email logic is now handled in executeOrder, but we can do it here if we want to ensure it for Razorpay only.
-        // Actually, sendPaymentReceiptEmail is called in verifyAndBuy originally. Let's keep it here for Razorpay explicitly.
-        try {
-            await sendPaymentReceiptEmail(user.email, symbol, qty, price);
-        } catch (emailError) {
-            console.error("Receipt email failed to send, but buy was successful:", emailError);
-        }
+        // The buy receipt is sent (fire-and-forget, with retry-queue capture) by
+        // executeOrder after commit. We no longer send it here — that would both
+        // duplicate the receipt and block the HTTP response on SMTP latency.
 
         return res.status(200).json({ success: true, message: `Successfully purchased ${qty} shares of ${symbol}!` });
     } catch (error) {

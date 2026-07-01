@@ -143,13 +143,6 @@ const executeOrder = async (order, executedPrice) => {
             });
             await position.save({ session });
 
-            // Try sending BUY receipt email
-            try {
-                await sendPaymentReceiptEmail(user.email, order.symbol, order.qty, executedPrice);
-            } catch (err) {
-                console.error("Failed to send buy receipt email:", err.message);
-            }
-
         } else if (order.side === 'SELL') {
             // Holdings are already deducted at placement in placeOrder, so we only credit funds here.
             // Atomic $inc avoids a lost-update race with concurrent balance writes.
@@ -158,13 +151,6 @@ const executeOrder = async (order, executedPrice) => {
                 { $inc: { walletBalance: roundedValue } },
                 { session }
             );
-
-            // Try sending SELL receipt email
-            try {
-                await sendSellReceiptEmail(user.email, order.symbol, order.qty, executedPrice);
-            } catch (err) {
-                console.error("Failed to send sell receipt email:", err.message);
-            }
         }
 
         order.status = 'EXECUTED';
@@ -175,9 +161,18 @@ const executeOrder = async (order, executedPrice) => {
         await session.commitTransaction();
         session.endSession();
 
-        // Emit for websocket
+        // Emit for websocket — this drives the in-app notification bell and is
+        // fired the instant the trade is committed, BEFORE (and independent of)
+        // any email. The bell never waits on or depends on email delivery.
         OrderEmitter.emit('order:executed', order);
         console.log(`[Matcher] Executed ${order.side} order ${order._id} for ${order.symbol} at ${executedPrice}`);
+
+        // Receipt email is fire-and-forget AFTER commit: it must never block the
+        // trade or the bell, and any failure is captured in the failedEmails queue
+        // by the email service itself (so no await, no rollback risk).
+        const receipt = order.side === 'BUY' ? sendPaymentReceiptEmail : sendSellReceiptEmail;
+        receipt(user.email, order.symbol, order.qty, executedPrice)
+            .catch(err => console.error(`[Matcher] Receipt email dispatch error for order ${order._id}:`, err.message));
 
     } catch (err) {
         await session.abortTransaction();
