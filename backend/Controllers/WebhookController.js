@@ -40,10 +40,13 @@ module.exports.handleWebhook = async (req, res) => {
                 return res.status(200).json({ status: "ignored", reason: "missing userId in notes" });
             }
 
-            // Check if payment already processed (Idempotency)
-            const existingTx = await WalletTransaction.findOne({ razorpayPaymentId: paymentId }).session(session);
-            if (existingTx && existingTx.status === "SUCCESS") {
-                console.log(`[Webhook] Payment ${paymentId} already credited. Skipping.`);
+            const creditAmount = Math.round(amountINR * 100) / 100;
+
+            // Idempotency keyed on the ORDER id (stable across retries) — at most
+            // one SUCCESS credit per order, backed by the partial unique index.
+            const alreadyCredited = await WalletTransaction.findOne({ razorpayOrderId: orderId, status: "SUCCESS" }).session(session);
+            if (alreadyCredited) {
+                console.log(`[Webhook] Order ${orderId} already credited. Skipping.`);
                 await session.commitTransaction();
                 session.endSession();
                 return res.status(200).json({ status: "success", message: "Already processed" });
@@ -54,24 +57,26 @@ module.exports.handleWebhook = async (req, res) => {
             if (pendingTx) {
                 pendingTx.razorpayPaymentId = paymentId;
                 pendingTx.status = "SUCCESS";
-                pendingTx.amount = amountINR;
+                pendingTx.amount = creditAmount;
                 await pendingTx.save({ session });
             } else {
                 await WalletTransaction.create([{
                     userId,
                     razorpayOrderId: orderId,
                     razorpayPaymentId: paymentId,
-                    amount: amountINR,
+                    amount: creditAmount,
                     status: "SUCCESS"
                 }], { session });
             }
 
-            // Credit the user's wallet
-            const user = await UserModel.findById(userId).session(session);
-            if (user) {
-                user.walletBalance = Math.round((user.walletBalance + amountINR) * 100) / 100;
-                await user.save({ session });
-                console.log(`[Webhook] Wallet credited for user ${userId} with ₹${amountINR}`);
+            // Credit the user's wallet atomically (no read-modify-write race)
+            const updatedUser = await UserModel.findByIdAndUpdate(
+                userId,
+                { $inc: { walletBalance: creditAmount } },
+                { new: true, session }
+            );
+            if (updatedUser) {
+                console.log(`[Webhook] Wallet credited for user ${userId} with ₹${creditAmount}`);
             } else {
                 console.warn(`[Webhook] User ${userId} not found.`);
             }
@@ -107,11 +112,19 @@ module.exports.handleWebhook = async (req, res) => {
         return res.status(200).json({ status: "success" });
 
     } catch (error) {
-        console.error("[Webhook] Processing Error:", error);
         if (session.inTransaction()) {
             await session.abortTransaction();
         }
         session.endSession();
+
+        // Concurrent duplicate lost the race on the one-SUCCESS-per-order index.
+        // The credit is already done — acknowledge so Razorpay stops retrying.
+        if (error && error.code === 11000) {
+            console.log("[Webhook] Duplicate delivery collapsed by unique index; already credited.");
+            return res.status(200).json({ status: "success", message: "Already processed" });
+        }
+
+        console.error("[Webhook] Processing Error:", error);
         return res.status(500).json({ status: "error", message: error.message });
     }
 };

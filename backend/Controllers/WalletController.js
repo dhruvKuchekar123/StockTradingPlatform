@@ -80,35 +80,45 @@ module.exports.createOrder = async (req, res) => {
 
 // 2. Verify Razorpay Payment and credit wallet
 module.exports.verifyPayment = async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const userId = req.user.id;
 
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return res.status(400).json({ success: false, message: "Missing required payment details." });
+    }
+
+    // Verify Razorpay signature server-side (skipped for demo gateway orders)
+    const isDemoOrder = razorpay_order_id.startsWith("order_demo_");
+    if (!isDemoOrder) {
+        if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
+            return res.status(400).json({ success: false, message: "Invalid signature. Verification failed." });
+        }
+    }
+
+    // Idempotency key is the ORDER id, not the payment id. A retry (or a demo
+    // double-click, which sends a fresh random payment id each time) reuses the
+    // same order id, so keying on it prevents a second credit for the same order.
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-        const userId = req.user.id;
-
-        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.status(400).json({ success: false, message: "Missing required payment details." });
+        const alreadyCredited = await WalletTransaction.findOne({ razorpayOrderId: razorpay_order_id, status: "SUCCESS" });
+        if (alreadyCredited) {
+            const user = await UserModel.findById(userId);
+            return res.status(200).json({
+                success: true,
+                message: "Payment verified successfully (already processed).",
+                walletBalance: user ? user.walletBalance : undefined
+            });
         }
+    } catch (err) {
+        console.error("Idempotency lookup failed:", err.message);
+        return res.status(500).json({ success: false, message: "Server error verifying payment." });
+    }
 
-        // Verify Razorpay signature server-side (skipped for demo gateway orders)
-        const isDemoOrder = razorpay_order_id.startsWith("order_demo_");
-        if (!isDemoOrder) {
-            if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
-                await session.abortTransaction();
-                session.endSession();
-                return res.status(400).json({ success: false, message: "Invalid signature. Verification failed." });
-            }
-        }
-
-        let amountINR;
+    // Resolve the amount to credit.
+    let amountINR;
+    try {
         if (isDemoOrder) {
-            const tx = await WalletTransaction.findOne({ razorpayOrderId: razorpay_order_id }).session(session);
+            const tx = await WalletTransaction.findOne({ razorpayOrderId: razorpay_order_id });
             if (!tx) {
-                await session.abortTransaction();
-                session.endSession();
                 return res.status(404).json({ success: false, message: "Demo transaction order not found in DB." });
             }
             amountINR = tx.amount;
@@ -116,28 +126,20 @@ module.exports.verifyPayment = async (req, res) => {
             const razorpay = getRazorpayInstance();
             const rzpOrder = await razorpay.orders.fetch(razorpay_order_id);
             if (!rzpOrder) {
-                await session.abortTransaction();
-                session.endSession();
                 return res.status(404).json({ success: false, message: "Razorpay order not found." });
             }
             amountINR = rzpOrder.amount / 100; // convert paise to INR
         }
+    } catch (err) {
+        console.error("Amount resolution failed:", err.message);
+        return res.status(502).json({ success: false, message: "Could not confirm payment amount with gateway." });
+    }
+    amountINR = Math.round(amountINR * 100) / 100;
 
-        // Check if this payment_id is already processed (Idempotency check)
-        const existingTx = await WalletTransaction.findOne({ razorpayPaymentId: razorpay_payment_id }).session(session);
-        if (existingTx && existingTx.status === "SUCCESS") {
-            // Already credited, return success immediately without crediting again
-            const user = await UserModel.findById(userId).session(session);
-            await session.commitTransaction();
-            session.endSession();
-            return res.status(200).json({ 
-                success: true, 
-                message: "Payment verified successfully (already processed).", 
-                walletBalance: user.walletBalance 
-            });
-        }
-
-        // Check if there is an existing pending transaction for this order
+    // Atomically mark the order SUCCESS and credit the wallet in one transaction.
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
         const pendingTx = await WalletTransaction.findOne({ razorpayOrderId: razorpay_order_id, status: "PENDING" }).session(session);
         if (pendingTx) {
             pendingTx.razorpayPaymentId = razorpay_payment_id;
@@ -145,7 +147,6 @@ module.exports.verifyPayment = async (req, res) => {
             pendingTx.amount = amountINR;
             await pendingTx.save({ session });
         } else {
-            // If for some reason the pending tx wasn't recorded, create a new one
             await WalletTransaction.create([{
                 userId,
                 razorpayOrderId: razorpay_order_id,
@@ -155,27 +156,57 @@ module.exports.verifyPayment = async (req, res) => {
             }], { session });
         }
 
-        // Credit the user's wallet (amount is stored in INR)
-        const user = await UserModel.findById(userId).session(session);
-        user.walletBalance = Math.round((user.walletBalance + amountINR) * 100) / 100;
-        await user.save({ session });
+        // Atomic credit — no read-modify-write race.
+        const updatedUser = await UserModel.findByIdAndUpdate(
+            userId,
+            { $inc: { walletBalance: amountINR } },
+            { new: true, session }
+        );
 
         await session.commitTransaction();
         session.endSession();
 
-        return res.status(200).json({ 
-            success: true, 
-            message: "Payment verified and credited to wallet.", 
-            walletBalance: user.walletBalance 
+        return res.status(200).json({
+            success: true,
+            message: "Payment verified and credited to wallet.",
+            walletBalance: updatedUser ? updatedUser.walletBalance : undefined
         });
-
     } catch (error) {
-        console.error("Verify Payment Error:", error);
         if (session.inTransaction()) {
             await session.abortTransaction();
         }
         session.endSession();
-        res.status(500).json({ success: false, message: "Server error verifying payment: " + error.message });
+
+        // Concurrent duplicate confirmation lost the race on the partial unique
+        // index (one SUCCESS per order). Someone else already credited it.
+        if (error && error.code === 11000) {
+            const user = await UserModel.findById(userId);
+            return res.status(200).json({
+                success: true,
+                message: "Payment verified successfully (already processed).",
+                walletBalance: user ? user.walletBalance : undefined
+            });
+        }
+
+        // Payment was confirmed but the wallet credit failed. Do NOT lose it —
+        // park the transaction as PENDING_RECONCILIATION so it shows up as
+        // "processing" in history and can be recovered, rather than vanishing.
+        try {
+            await WalletTransaction.findOneAndUpdate(
+                { razorpayOrderId: razorpay_order_id },
+                { $set: { userId, razorpayPaymentId: razorpay_payment_id, amount: amountINR, status: "PENDING_RECONCILIATION" } },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+        } catch (logErr) {
+            console.error("Failed to record reconciliation transaction:", logErr.message);
+        }
+
+        console.error("Verify Payment Error (credit failed, parked for reconciliation):", error.message);
+        return res.status(202).json({
+            success: true,
+            status: "processing",
+            message: "Payment received. Your wallet credit is being processed and will reflect shortly."
+        });
     }
 };
 

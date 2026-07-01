@@ -93,14 +93,21 @@ const executeOrder = async (order, executedPrice) => {
         const user = await UserModel.findById(order.userId).session(session);
         const totalValue = executedPrice * order.qty;
 
+        const roundedValue = Math.round(totalValue * 100) / 100;
+
         if (order.side === 'BUY') {
-            // Deduct funds if not already verified by Razorpay
+            // Deduct funds if not already verified by Razorpay / debited at placement.
             if (!order.paymentVerified) {
-                if (user.walletBalance < totalValue) {
+                // Atomic check-and-debit — the balance guard and the decrement are a
+                // single operation, so a double-execution can't spend the same rupee twice.
+                const debitedUser = await UserModel.findOneAndUpdate(
+                    { _id: order.userId, walletBalance: { $gte: roundedValue } },
+                    { $inc: { walletBalance: -roundedValue } },
+                    { new: true, session }
+                );
+                if (!debitedUser) {
                     throw new Error("Insufficient wallet balance for execution");
                 }
-                user.walletBalance -= totalValue;
-                await user.save({ session });
             }
 
             // Upsert Holdings — scoped by userId to prevent cross-user data corruption
@@ -144,9 +151,13 @@ const executeOrder = async (order, executedPrice) => {
             }
 
         } else if (order.side === 'SELL') {
-            // Holdings are already deducted at placement in placeOrder, so we only credit funds here
-            user.walletBalance = Math.round((user.walletBalance + totalValue) * 100) / 100;
-            await user.save({ session });
+            // Holdings are already deducted at placement in placeOrder, so we only credit funds here.
+            // Atomic $inc avoids a lost-update race with concurrent balance writes.
+            await UserModel.findByIdAndUpdate(
+                order.userId,
+                { $inc: { walletBalance: roundedValue } },
+                { session }
+            );
 
             // Try sending SELL receipt email
             try {

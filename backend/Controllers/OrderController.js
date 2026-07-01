@@ -90,12 +90,19 @@ module.exports.placeOrder = async (req, res) => {
         try {
             // A. Debit wallet (BUY) or Deduct holdings (SELL)
             if (side === 'BUY') {
-                const user = await UserModel.findById(userId).session(session);
-                if (user.walletBalance < totalCost) {
+                // Atomic check-and-debit: the { walletBalance: >= cost } guard and the
+                // decrement happen in ONE operation, so two rapid double-submits cannot
+                // both pass the check and spend the same rupee twice. The second update
+                // matches no document and throws.
+                const debitCost = Math.round(totalCost * 100) / 100;
+                const debitedUser = await UserModel.findOneAndUpdate(
+                    { _id: userId, walletBalance: { $gte: debitCost } },
+                    { $inc: { walletBalance: -debitCost } },
+                    { new: true, session }
+                );
+                if (!debitedUser) {
                     throw new Error("Insufficient wallet balance at transaction start.");
                 }
-                user.walletBalance = Math.round((user.walletBalance - totalCost) * 100) / 100;
-                await user.save({ session });
             } else if (side === 'SELL') {
                 // Scope by userId — deduct from this user's holdings only
                 const holding = await HoldingsModel.findOne({ userId, name: symbol }).session(session);
