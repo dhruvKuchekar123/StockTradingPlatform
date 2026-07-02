@@ -131,17 +131,28 @@ const executeOrder = async (order, executedPrice) => {
                 await holding.save({ session });
             }
 
-            // Insert into Positions
-            const position = new PositionsModel({
-                name: order.symbol,
-                qty: order.qty,
-                avg: executedPrice,
-                price: executedPrice,
-                net: "+0.00%",
-                day: "+0.00%",
-                isLoss: false
-            });
-            await position.save({ session });
+            // Upsert Positions — scoped by userId to prevent cross-user data corruption
+            let position = await PositionsModel.findOne({ userId: order.userId, name: order.symbol }).session(session);
+            if (position) {
+                const oldTotal = position.qty * position.avg;
+                position.qty += order.qty;
+                position.avg = (oldTotal + totalValue) / position.qty;
+                position.price = executedPrice;
+                await position.save({ session });
+            } else {
+                position = new PositionsModel({
+                    userId: order.userId,
+                    product: 'CNC',
+                    name: order.symbol,
+                    qty: order.qty,
+                    avg: executedPrice,
+                    price: executedPrice,
+                    net: "+0.00%",
+                    day: "+0.00%",
+                    isLoss: false
+                });
+                await position.save({ session });
+            }
 
         } else if (order.side === 'SELL') {
             // Holdings are already deducted at placement in placeOrder, so we only credit funds here.
@@ -151,6 +162,17 @@ const executeOrder = async (order, executedPrice) => {
                 { $inc: { walletBalance: roundedValue } },
                 { session }
             );
+
+            // Scoped positions update
+            let position = await PositionsModel.findOne({ userId: order.userId, name: order.symbol }).session(session);
+            if (position) {
+                position.qty -= order.qty;
+                if (position.qty <= 0) {
+                    await PositionsModel.deleteOne({ _id: position._id }).session(session);
+                } else {
+                    await position.save({ session });
+                }
+            }
         }
 
         order.status = 'EXECUTED';

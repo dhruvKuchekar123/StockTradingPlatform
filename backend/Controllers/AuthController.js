@@ -117,6 +117,7 @@ module.exports.GoogleLogin = async (req, res, next) => {
 
 module.exports.Signup = async (req, res, next) => {
   try {
+    console.log("SIGNUP REQ BODY:", JSON.stringify(req.body));
     const { email, password, username, createdAt, bankDetails } = req.body;
 
     // 1. Strict Validations

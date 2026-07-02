@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const UserModel = require("../model/UserModel");
 const HoldingsModel = require("../model/HoldingModel");
+const PositionsModel = require("../model/PositionsModel");
 const OrdersModel = require("../model/OrdersModel");
 const MarketService = require("../util/MarketService");
 const PriceService = require("../services/PriceService");
@@ -78,6 +79,17 @@ module.exports.executeSell = async (req, res) => {
             await HoldingsModel.deleteOne({ _id: holding._id }).session(session);
         } else {
             await holding.save({ session });
+        }
+
+        // Deduct/delete position
+        let position = await PositionsModel.findOne({ userId, name: symbol }).session(session);
+        if (position) {
+            position.qty -= Number(qty);
+            if (position.qty <= 0) {
+                await PositionsModel.deleteOne({ _id: position._id }).session(session);
+            } else {
+                await position.save({ session });
+            }
         }
 
         // Credit funds to user wallet

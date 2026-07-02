@@ -34,10 +34,9 @@ module.exports.getPortfolio = async (req, res) => {
       }
     }
 
-    // Since Holdings and Orders don't have a userId, we fetch global for the prototype
-    // In a real multi-tenant app, this would be `HoldingsModel.find({ userId: user._id })`
-    const holdings = await HoldingsModel.find();
-    const orders = await OrdersModel.find().sort({ _id: -1 }).limit(10); // get latest 10 orders
+    // Properly scope holdings and orders by user ID to prevent cross-tenant exposure
+    const holdings = await HoldingsModel.find({ userId: user._id });
+    const orders = await OrdersModel.find({ userId: user._id }).sort({ _id: -1 }).limit(10);
 
     let totalInvested = 0;
     let currentValue = 0;
