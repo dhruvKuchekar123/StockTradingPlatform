@@ -41,6 +41,19 @@ const userSchema = new mongoose.Schema({
     enum: ["user", "admin"],
     default: "user",
   },
+  plan: {
+    type: String,
+    enum: ["BASIC", "PRO", "PREMIUM"],
+    default: "BASIC",
+  },
+  lastLogin: {
+    type: Date,
+    default: null,
+  },
+  suspended: {
+    type: Boolean,
+    default: false, // blocks login; does NOT delete any data
+  },
   bankDetails: {
     accountName: { type: String, default: "" },
     accountNumber: { type: String, default: "" },

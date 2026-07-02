@@ -51,6 +51,21 @@ module.exports.adminVerification = (req, res, next) => {
   });
 };
 
+/**
+ * Admin gate. Assumes userVerification has already run and populated req.user
+ * (chain as: userVerification, isAdmin). This is a server-side check — it cannot
+ * be bypassed by unhiding a frontend button or guessing a URL.
+ */
+module.exports.isAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ status: false, message: "Authentication required" });
+  }
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ status: false, message: "Access denied. Admins only." });
+  }
+  next();
+};
+
 module.exports.checkUserStatus = (req, res) => {
   let token = req.cookies.token;
   if (!token && req.headers.authorization) {
@@ -64,6 +79,9 @@ module.exports.checkUserStatus = (req, res) => {
     if (err) return res.json({ status: false });
     const user = await User.findById(data.id);
     if (user) {
+      if (user.suspended) {
+        return res.json({ status: false, code: "SUSPENDED", message: "Your account has been suspended. Please contact support." });
+      }
       if (!user.isVerified) {
         return res.json({ status: false, code: "NOT_VERIFIED", message: "Please verify your email first." });
       }

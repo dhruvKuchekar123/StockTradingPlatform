@@ -93,14 +93,21 @@ const executeOrder = async (order, executedPrice) => {
         const user = await UserModel.findById(order.userId).session(session);
         const totalValue = executedPrice * order.qty;
 
+        const roundedValue = Math.round(totalValue * 100) / 100;
+
         if (order.side === 'BUY') {
-            // Deduct funds if not already verified by Razorpay
+            // Deduct funds if not already verified by Razorpay / debited at placement.
             if (!order.paymentVerified) {
-                if (user.walletBalance < totalValue) {
+                // Atomic check-and-debit — the balance guard and the decrement are a
+                // single operation, so a double-execution can't spend the same rupee twice.
+                const debitedUser = await UserModel.findOneAndUpdate(
+                    { _id: order.userId, walletBalance: { $gte: roundedValue } },
+                    { $inc: { walletBalance: -roundedValue } },
+                    { new: true, session }
+                );
+                if (!debitedUser) {
                     throw new Error("Insufficient wallet balance for execution");
                 }
-                user.walletBalance -= totalValue;
-                await user.save({ session });
             }
 
             // Upsert Holdings — scoped by userId to prevent cross-user data corruption
@@ -136,24 +143,14 @@ const executeOrder = async (order, executedPrice) => {
             });
             await position.save({ session });
 
-            // Try sending BUY receipt email
-            try {
-                await sendPaymentReceiptEmail(user.email, order.symbol, order.qty, executedPrice);
-            } catch (err) {
-                console.error("Failed to send buy receipt email:", err.message);
-            }
-
         } else if (order.side === 'SELL') {
-            // Holdings are already deducted at placement in placeOrder, so we only credit funds here
-            user.walletBalance = Math.round((user.walletBalance + totalValue) * 100) / 100;
-            await user.save({ session });
-
-            // Try sending SELL receipt email
-            try {
-                await sendSellReceiptEmail(user.email, order.symbol, order.qty, executedPrice);
-            } catch (err) {
-                console.error("Failed to send sell receipt email:", err.message);
-            }
+            // Holdings are already deducted at placement in placeOrder, so we only credit funds here.
+            // Atomic $inc avoids a lost-update race with concurrent balance writes.
+            await UserModel.findByIdAndUpdate(
+                order.userId,
+                { $inc: { walletBalance: roundedValue } },
+                { session }
+            );
         }
 
         order.status = 'EXECUTED';
@@ -164,9 +161,18 @@ const executeOrder = async (order, executedPrice) => {
         await session.commitTransaction();
         session.endSession();
 
-        // Emit for websocket
+        // Emit for websocket — this drives the in-app notification bell and is
+        // fired the instant the trade is committed, BEFORE (and independent of)
+        // any email. The bell never waits on or depends on email delivery.
         OrderEmitter.emit('order:executed', order);
         console.log(`[Matcher] Executed ${order.side} order ${order._id} for ${order.symbol} at ${executedPrice}`);
+
+        // Receipt email is fire-and-forget AFTER commit: it must never block the
+        // trade or the bell, and any failure is captured in the failedEmails queue
+        // by the email service itself (so no await, no rollback risk).
+        const receipt = order.side === 'BUY' ? sendPaymentReceiptEmail : sendSellReceiptEmail;
+        receipt(user.email, order.symbol, order.qty, executedPrice)
+            .catch(err => console.error(`[Matcher] Receipt email dispatch error for order ${order._id}:`, err.message));
 
     } catch (err) {
         await session.abortTransaction();

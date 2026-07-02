@@ -27,7 +27,26 @@ const fetchAndBroadcast = async () => {
             console.log(`[Poller] Updated ${Object.keys(updatePayload).length} symbols at ${new Date().toISOString()}`);
         }
     } catch (err) {
-        console.error("[Poller] Error fetching prices:", err.message);
+        // A mid-tick failure must NOT silently freeze the feed. Keep the socket
+        // alive by re-broadcasting the last-known cached prices, flagged as stale
+        // so the frontend can indicate the data is no longer live. Emitted on a
+        // dedicated "price:stale" channel that the order matcher does NOT listen
+        // to, so execution never runs on stale prices.
+        console.error("[Poller] Error fetching prices, serving last-known prices as stale:", err.message);
+        try {
+            const stalePayload = {};
+            for (const symbol of activeSymbols) {
+                const cached = await CacheService.getPrice(symbol);
+                if (cached) {
+                    stalePayload[symbol] = { ...cached, isStale: true };
+                }
+            }
+            if (Object.keys(stalePayload).length > 0) {
+                priceEmitter.emit("price:stale", stalePayload);
+            }
+        } catch (broadcastErr) {
+            console.error("[Poller] Failed to broadcast stale prices:", broadcastErr.message);
+        }
     }
 };
 

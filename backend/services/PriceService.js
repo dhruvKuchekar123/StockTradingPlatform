@@ -29,7 +29,8 @@ const fetchMockPrice = (symbol) => {
         price,
         change,
         changePercent,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        isMockData: true // simulated/fallback price — never a real market quote
     };
 };
 
@@ -43,7 +44,8 @@ const fetchAlphaVantagePrice = async (symbol) => {
                 price: parseFloat(quote["05. price"]),
                 change: parseFloat(quote["09. change"]),
                 changePercent: parseFloat(quote["10. change percent"].replace("%", "")),
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                isMockData: false
             };
         }
         return fetchMockPrice(symbol);
@@ -66,7 +68,8 @@ const fetchYahooPrice = async (symbol) => {
                 price: quote.regularMarketPrice,
                 change: quote.regularMarketChange,
                 changePercent: quote.regularMarketChangePercent,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                isMockData: false
             };
         }
         return fetchMockPrice(symbol);

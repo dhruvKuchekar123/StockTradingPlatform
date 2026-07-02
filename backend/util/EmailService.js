@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const FailedEmail = require("../model/FailedEmailModel");
 require("dotenv").config();
 
 const transporter = nodemailer.createTransport({
@@ -9,24 +10,103 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-module.exports.sendEmail = async (to, subject, html) => {
+/**
+ * Persist a failed send to the dead-letter queue so the receipt/OTP is never
+ * lost and can be requeued later. Best-effort: if even this write fails, we log
+ * and move on — we must NEVER throw back to the caller (that would risk failing
+ * the trade/signup the email is attached to).
+ */
+const recordFailedEmail = async (mailOptions, type, error) => {
   try {
-    const mailOptions = {
-      from: `"StockFlow" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully to:", to);
-  } catch (error) {
-    console.error("Email sending failed:", error);
+    await FailedEmail.create({
+      to: mailOptions.to,
+      from: mailOptions.from,
+      subject: mailOptions.subject,
+      html: mailOptions.html,
+      type,
+      lastError: error && error.message,
+    });
+  } catch (persistErr) {
+    console.error(`[Email] Could not persist failed ${type} email to queue:`, persistErr.message);
   }
 };
 
-module.exports.sendPaymentReceiptEmail = async (to, stockName, qty, price) => {
+/**
+ * Single choke-point for all outbound mail. Never throws — returns
+ * { success } and, on failure, records the message to the retry queue.
+ */
+const deliver = async (mailOptions, type) => {
   try {
+    await transporter.sendMail(mailOptions);
+    console.log(`[Email] Sent ${type} to:`, mailOptions.to);
+    return { success: true };
+  } catch (error) {
+    console.error(`[Email] Failed to send ${type} to ${mailOptions.to}:`, error.message);
+    await recordFailedEmail(mailOptions, type, error);
+    return { success: false, error };
+  }
+};
+
+/**
+ * Requeue: re-attempt everything in the failedEmails collection. Safe to call
+ * from an admin endpoint or a scheduled job. Returns a summary.
+ */
+module.exports.retryFailedEmails = async (limit = 50) => {
+  const pending = await FailedEmail.find({ status: "PENDING" }).sort({ createdAt: 1 }).limit(limit);
+  let sent = 0, stillFailing = 0;
+  for (const item of pending) {
+    try {
+      await transporter.sendMail({ from: item.from, to: item.to, subject: item.subject, html: item.html });
+      item.status = "SENT";
+      item.lastAttemptAt = new Date();
+      await item.save();
+      sent++;
+    } catch (err) {
+      item.attempts += 1;
+      item.lastError = err.message;
+      item.lastAttemptAt = new Date();
+      await item.save();
+      stillFailing++;
+    }
+  }
+  return { processed: pending.length, sent, stillFailing };
+};
+
+/**
+ * Resend a single queued failure by its id. Returns enough state for the caller
+ * to write an audit entry. Never throws.
+ */
+module.exports.resendFailedEmail = async (id) => {
+  const item = await FailedEmail.findById(id);
+  if (!item) return { found: false };
+  const before = { status: item.status, attempts: item.attempts };
+  try {
+    await transporter.sendMail({ from: item.from, to: item.to, subject: item.subject, html: item.html });
+    item.status = "SENT";
+    item.lastAttemptAt = new Date();
+    await item.save();
+    return { found: true, sent: true, to: item.to, type: item.type, before, after: { status: "SENT", attempts: item.attempts } };
+  } catch (err) {
+    item.attempts += 1;
+    item.lastError = err.message;
+    item.lastAttemptAt = new Date();
+    await item.save();
+    return { found: true, sent: false, to: item.to, type: item.type, before, after: { status: item.status, attempts: item.attempts }, error: err.message };
+  }
+};
+
+module.exports.sendEmail = async (to, subject, html) => {
+  const mailOptions = {
+    from: `"StockFlow" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html,
+  };
+  const { success } = await deliver(mailOptions, "GENERIC");
+  return success;
+};
+
+module.exports.sendPaymentReceiptEmail = async (to, stockName, qty, price) => {
     const total = (qty * price).toFixed(2);
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
@@ -61,15 +141,11 @@ module.exports.sendPaymentReceiptEmail = async (to, stockName, qty, price) => {
       html,
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log("Receipt Email sent successfully to:", to);
-  } catch (error) {
-    console.error("Receipt Email sending failed:", error);
-  }
+    const { success } = await deliver(mailOptions, "BUY_RECEIPT");
+    return success;
 };
 
 module.exports.sendSellReceiptEmail = async (to, stockName, qty, price) => {
-  try {
     const total = (qty * price).toFixed(2);
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
@@ -108,15 +184,11 @@ module.exports.sendSellReceiptEmail = async (to, stockName, qty, price) => {
       html,
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log("Sell Receipt Email sent successfully to:", to);
-  } catch (error) {
-    console.error("Sell Receipt Email sending failed:", error);
-  }
+    const { success } = await deliver(mailOptions, "SELL_RECEIPT");
+    return success;
 };
 
 module.exports.sendOTPEmail = async (to, otp) => {
-  try {
     const html = `
       <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2bd2f; border-radius: 12px; max-width: 500px; background-color: #06080c; color: #ffffff;">
         <h2 style="color: #e2bd2f; border-bottom: 1px solid rgba(226,189,47,0.3); padding-bottom: 10px;">StockFlow Pro - Verification Code</h2>
@@ -139,9 +211,8 @@ module.exports.sendOTPEmail = async (to, otp) => {
     };
 
     console.log(`[OTP SERVICE] Generated OTP for ${to} is: ${otp}`);
-    await transporter.sendMail(mailOptions);
-    console.log("OTP Email sent successfully to:", to);
-  } catch (error) {
-    console.log(`[OTP SERVICE] Generated OTP for ${to} is: ${otp} (Failed sending: ${error.message})`);
-  }
+    // Return whether the mail actually went out so signup can tell the user to
+    // resend rather than falsely claiming the email was sent.
+    const { success } = await deliver(mailOptions, "OTP");
+    return success;
 };

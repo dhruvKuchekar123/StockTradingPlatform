@@ -12,18 +12,58 @@ if (!GOOGLE_CLIENT_ID) {
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 module.exports.GoogleLogin = async (req, res, next) => {
+  let payload;
   try {
     const { token } = req.body;
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: GOOGLE_CLIENT_ID,
     });
-    const { email, name } = ticket.getPayload();
+    payload = ticket.getPayload();
+  } catch (error) {
+    // Distinguish a transient Google/network failure from an invalid token.
+    // Network-level errors (DNS, connection reset, timeout, TLS) surface as
+    // system error codes or generic fetch failures — these are our fault/Google's,
+    // not the user's, so return a 502 (Bad Gateway) instead of a 400.
+    const networkCodes = ["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ECONNABORTED"];
+    const msg = (error && error.message) || "";
+    const isNetworkError =
+      networkCodes.includes(error && error.code) ||
+      /network|timed? ?out|fetch failed|socket hang up|getaddrinfo|ENETUNREACH/i.test(msg);
 
-    let user = await User.findOne({ email });
+    if (isNetworkError) {
+      console.error("Google Login upstream error:", msg);
+      return res.status(502).json({
+        success: false,
+        message: "Could not reach Google to verify your sign-in. Please try again in a moment.",
+      });
+    }
+    console.error("Google Login Error:", msg);
+    return res.status(400).json({ success: false, message: "Google Login failed" });
+  }
+
+  try {
+    const { email, name, email_verified } = payload;
+
+    // 1. Reject sign-ins whose Google email is not verified. An unverified email
+    //    is not a proven identity and must never be silently accepted or linked.
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Google account did not provide an email address" });
+    }
+    if (email_verified === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Your Google email is not verified. Please verify it with Google, then try again.",
+      });
+    }
+
+    // 2. Match existing accounts by email, case-insensitively, so a Google sign-in
+    //    links to an existing password account instead of creating a duplicate user.
+    const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let user = await User.findOne({ email: { $regex: `^${escaped}$`, $options: "i" } });
 
     if (!user) {
-      // Use cryptographically random placeholder password for Google-only accounts
+      // No existing account — create a Google-only account with a random placeholder password.
       const placeholderPassword = crypto.randomBytes(32).toString("hex");
       user = await User.create({
         email,
@@ -32,7 +72,18 @@ module.exports.GoogleLogin = async (req, res, next) => {
         isVerified: true,
         isApproved: true,
       });
+    } else if (!user.isVerified) {
+      // Linking to a pre-existing account: a verified Google email proves ownership,
+      // so promote the account to verified without touching its password.
+      user.isVerified = true;
     }
+
+    if (user.suspended) {
+      return res.status(403).json({ success: false, message: "Your account has been suspended. Please contact support." });
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
 
     const secretToken = createSecretToken(user._id);
     res.cookie("token", secretToken, {
@@ -56,8 +107,10 @@ module.exports.GoogleLogin = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error("Google Login Error:", error.message);
-    return res.status(400).json({ success: false, message: "Google Login failed" });
+    // Token is already verified at this point; a failure here is server-side
+    // (database/session), so surface it as a 500 rather than a 400.
+    console.error("Google Login post-verification error:", error.message);
+    return res.status(500).json({ success: false, message: "Internal server error during Google login" });
   }
 };
 
@@ -122,17 +175,62 @@ module.exports.Signup = async (req, res, next) => {
       isApproved: true,
     });
 
-    // Send OTP via Email
-    await sendOTPEmail(email, otp);
+    // Send OTP via Email. The account is already created, so a mail failure must
+    // NOT fail signup — instead tell the client the email didn't go out so it can
+    // offer a "Resend OTP" action.
+    const emailSent = await sendOTPEmail(email, otp);
 
     return res.status(201).json({
       success: true,
-      message: "OTP sent to your email. Please verify to continue.",
+      emailSent,
+      message: emailSent
+        ? "OTP sent to your email. Please verify to continue."
+        : "Account created, but we couldn't send the verification email. Please use 'Resend OTP' to try again.",
       email
     });
   } catch (error) {
     console.error("Signup error:", error);
     res.status(500).json({ success: false, message: "Internal server error during signup" });
+  }
+};
+
+module.exports.ResendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    // Case-insensitive match, consistent with the rest of auth.
+    const escaped = String(email).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const user = await User.findOne({ email: { $regex: `^${escaped}$`, $options: "i" } });
+
+    // Do not reveal whether the account exists; respond the same either way.
+    if (!user || user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        emailSent: false,
+        message: "If an unverified account exists for this email, a new OTP has been sent.",
+      });
+    }
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+    user.signupOTP = otp;
+    user.signupOTPExpires = new Date(Date.now() + 600000); // 10 minutes
+    user.otpAttempts = 0;
+    await user.save();
+
+    const emailSent = await sendOTPEmail(user.email, otp);
+    return res.status(200).json({
+      success: true,
+      emailSent,
+      message: emailSent
+        ? "A new verification code has been sent to your email."
+        : "We still couldn't send the email. Please try again shortly.",
+    });
+  } catch (error) {
+    console.error("ResendOTP error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error while resending OTP" });
   }
 };
 
@@ -331,6 +429,12 @@ module.exports.Login = async (req, res, next) => {
     if (!auth) {
       return res.status(401).json({ success: false, message: "Incorrect password or email" });
     }
+    if (user.suspended) {
+      return res.status(403).json({ success: false, message: "Your account has been suspended. Please contact support." });
+    }
+    user.lastLogin = new Date();
+    await user.save();
+
     const token = createSecretToken(user._id);
     res.cookie("token", token, {
       path: "/",

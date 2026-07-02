@@ -61,8 +61,8 @@ module.exports.initPriceSocket = (httpServer) => {
         });
     });
 
-    // Broadcast updates from Poller
-    priceEmitter.on("price:update", (updatedPrices) => {
+    // Broadcast a price map (live or stale) to each client's subscribed symbols.
+    const broadcastPrices = (updatedPrices) => {
         clients.forEach((clientData, ws) => {
             if (ws.readyState === ws.OPEN) {
                 const filteredData = {};
@@ -80,7 +80,14 @@ module.exports.initPriceSocket = (httpServer) => {
                 }
             }
         });
-    });
+    };
+
+    // Live updates from the poller.
+    priceEmitter.on("price:update", broadcastPrices);
+
+    // Stale re-broadcast when a poll tick fails — same payload shape, but the
+    // per-symbol isStale flag lets the client show the feed is no longer live.
+    priceEmitter.on("price:stale", broadcastPrices);
 
     // Send order execution notifications directly to the owner
     OrderEmitter.on('order:executed', (order) => {
