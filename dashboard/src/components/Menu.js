@@ -37,6 +37,10 @@ const Menu = ({ username }) => {
   }, []);
 
   const handleLogout = () => {
+    if (!window.confirm("Are you sure you want to log out from StockFlow Pro?")) {
+      return;
+    }
+
     // 1. Clear client-side storage FIRST (synchronous, instant)
     localStorage.removeItem("token");
     localStorage.removeItem("sf_onboarding_done"); // Reset tour if desired
