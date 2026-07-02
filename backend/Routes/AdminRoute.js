@@ -1,6 +1,6 @@
 const { getPendingUsers, approveUser, rejectUser, retryFailedEmails } = require("../Controllers/AdminController");
 const { getUsers, getOrdersOverview, getWalletOverview, getSystemHealth, getFailedEmails } = require("../Controllers/AdminAnalyticsController");
-const { setUserSuspension, cancelStuckOrder, reconcileWallet, resendQueuedEmail, overrideUserPlan, getAdminActions } = require("../Controllers/AdminWriteController");
+const { setUserSuspension, cancelStuckOrder, reconcileWallet, resendQueuedEmail, overrideUserPlan, getAdminActions, updateTransactionStatus } = require("../Controllers/AdminWriteController");
 const { adminVerification, userVerification, isAdmin } = require("../Middlewares/AuthMiddleware");
 const router = require("express").Router();
 
@@ -21,6 +21,7 @@ router.get("/emails", userVerification, isAdmin, getFailedEmails);
 router.post("/users/:userId/suspension", userVerification, isAdmin, setUserSuspension);
 router.post("/orders/:orderId/cancel", userVerification, isAdmin, cancelStuckOrder);
 router.post("/wallet/reconcile/:transactionId", userVerification, isAdmin, reconcileWallet);
+router.post("/wallet/transaction/:transactionId/status", userVerification, isAdmin, updateTransactionStatus);
 router.post("/emails/:emailId/resend", userVerification, isAdmin, resendQueuedEmail);
 router.post("/users/:userId/plan", userVerification, isAdmin, overrideUserPlan);
 router.get("/actions", userVerification, isAdmin, getAdminActions);

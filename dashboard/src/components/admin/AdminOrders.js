@@ -37,6 +37,7 @@ const AdminOrders = () => {
   useEffect(() => { load(); }, [load]);
 
   const select = { padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "rgba(255,255,255,0.03)", color: "#fff", outline: "none" };
+  const optionStyle = { background: "#1b1d24", color: "#ffffff" };
 
   return (
     <div className="glass-card p-5">
@@ -44,17 +45,17 @@ const AdminOrders = () => {
         <h3 style={{ margin: 0 }}>Orders — all users <span style={{ color: "var(--text-dim)", fontWeight: 500 }}>({data.pagination.total})</span></h3>
         <div style={{ display: "flex", gap: 8 }}>
           <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} style={select}>
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="filled">Filled</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="" style={optionStyle}>All statuses</option>
+            <option value="open" style={optionStyle}>Open</option>
+            <option value="filled" style={optionStyle}>Filled</option>
+            <option value="cancelled" style={optionStyle}>Cancelled</option>
           </select>
           <select value={orderType} onChange={(e) => { setPage(1); setOrderType(e.target.value); }} style={select}>
-            <option value="">All types</option>
-            <option value="MARKET">MARKET</option>
-            <option value="LIMIT">LIMIT</option>
-            <option value="SL">SL</option>
-            <option value="GTT">GTT</option>
+            <option value="" style={optionStyle}>All types</option>
+            <option value="MARKET" style={optionStyle}>MARKET</option>
+            <option value="LIMIT" style={optionStyle}>LIMIT</option>
+            <option value="SL" style={optionStyle}>SL</option>
+            <option value="GTT" style={optionStyle}>GTT</option>
           </select>
         </div>
       </div>

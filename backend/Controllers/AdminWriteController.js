@@ -194,6 +194,55 @@ module.exports.overrideUserPlan = async (req, res) => {
     }
 };
 
+// 5b. Update transaction status directly (PENDING, SUCCESS, FAILED)
+module.exports.updateTransactionStatus = async (req, res) => {
+    try {
+        const reason = requireReason(req, res);
+        if (reason === null) return;
+
+        const newStatus = String(req.body.status || "").toUpperCase();
+        const allowed = ["PENDING", "SUCCESS", "FAILED"];
+        if (!allowed.includes(newStatus)) {
+            return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowed.join(", ")}` });
+        }
+
+        const tx = await WalletTransaction.findById(req.params.transactionId);
+        if (!tx) return res.status(404).json({ success: false, message: "Transaction not found" });
+
+        const user = await UserModel.findById(tx.userId);
+        if (!user) return res.status(404).json({ success: false, message: "Target user not found" });
+
+        const before = { walletBalance: user.walletBalance, txStatus: tx.status };
+        const oldStatus = tx.status;
+
+        // Perform balance adjustment if status changes to/from SUCCESS
+        if (newStatus === "SUCCESS" && oldStatus !== "SUCCESS") {
+            user.walletBalance = Math.round((user.walletBalance + tx.amount) * 100) / 100;
+        } else if (newStatus !== "SUCCESS" && oldStatus === "SUCCESS") {
+            user.walletBalance = Math.max(0, Math.round((user.walletBalance - tx.amount) * 100) / 100);
+        }
+
+        tx.status = newStatus;
+        await user.save();
+        await tx.save();
+
+        const after = { walletBalance: user.walletBalance, txStatus: tx.status };
+
+        await logAdminAction({
+            adminId: req.user._id,
+            action: "UPDATE_TRANSACTION_STATUS",
+            targetUserId: tx.userId,
+            reason, before, after,
+            metadata: { transactionId: tx._id, amount: tx.amount, oldStatus, newStatus },
+        });
+
+        return res.json({ success: true, message: `Transaction status set to ${newStatus}.`, walletBalance: user.walletBalance, status: newStatus });
+    } catch (error) {
+        console.error("[Admin] updateTransactionStatus error:", error);
+        return res.status(500).json({ success: false, message: "Error updating transaction status" });
+    }
+};
+
 // Read-only: the audit log itself (so admins can review who did what)
 module.exports.getAdminActions = async (req, res) => {
     try {

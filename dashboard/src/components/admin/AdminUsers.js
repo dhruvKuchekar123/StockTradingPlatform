@@ -6,6 +6,7 @@ const th = { padding: "12px", color: "var(--text-dim)", fontSize: 12, fontWeight
 const td = { padding: "12px 12px", fontSize: 14, borderBottom: "1px solid rgba(255,255,255,0.03)" };
 const statusColor = (s) => (s === "ACTIVE" ? "#10B981" : s === "PENDING_APPROVAL" ? "#F59E0B" : "#EF4444");
 const btn = { padding: "5px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "1px solid var(--border)", background: "rgba(255,255,255,0.04)", color: "var(--text-main)" };
+const optionStyle = { background: "#1b1d24", color: "#ffffff" };
 
 const AdminUsers = () => {
   const [data, setData] = useState({ users: [], pagination: { page: 1, totalPages: 1, total: 0 } });
@@ -65,8 +66,8 @@ const AdminUsers = () => {
                 <td style={td}>
                   <select defaultValue="" onChange={(e) => { if (e.target.value) { askPlan(u, e.target.value); e.target.value = ""; } }}
                     style={{ ...btn, background: "rgba(255,255,255,0.04)" }} title={`Current: ${u.plan}`}>
-                    <option value="">{u.plan} ▾</option>
-                    {["BASIC", "PRO", "PREMIUM"].filter((p) => p !== u.plan).map((p) => <option key={p} value={p}>Set {p}</option>)}
+                    <option value="" style={optionStyle}>{u.plan} ▾</option>
+                    {["BASIC", "PRO", "PREMIUM"].filter((p) => p !== u.plan).map((p) => <option key={p} value={p} style={optionStyle}>Set {p}</option>)}
                   </select>
                 </td>
                 <td style={{ ...td, color: statusColor(u.accountStatus), fontWeight: 700, fontSize: 12 }}>{u.accountStatus}</td>

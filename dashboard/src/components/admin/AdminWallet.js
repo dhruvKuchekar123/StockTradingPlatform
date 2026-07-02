@@ -25,8 +25,21 @@ const AdminWallet = () => {
     onConfirm: async (reason) => { await adminPost(`/wallet/reconcile/${t.id}`, { reason }); setModal(null); load(); },
   });
 
-  if (error) return <div className="glass-card p-5" style={{ color: "#EF4444" }}>{error}</div>;
-  if (!data) return <div className="glass-card p-5" style={{ color: "var(--text-dim)" }}>Loading…</div>;
+  const askChangeStatus = (t, newStatus) => {
+    if (t.status === newStatus) return;
+    setModal({
+      title: "Update transaction status",
+      message: `Change status of transaction for ${t.user} (${formatINR(t.amount)}) from ${t.status} to ${newStatus}? Setting to SUCCESS will credit their wallet. Setting from SUCCESS to another status will deduct the amount. This is logged to the audit log.`,
+      confirmLabel: `Set ${newStatus}`,
+      onConfirm: async (reason) => {
+        await adminPost(`/wallet/transaction/${t.id}/status`, { status: newStatus, reason });
+        setModal(null);
+        load();
+      },
+    });
+  };
+
+  const optionStyle = { background: "#1b1d24", color: "#ffffff" };
 
   const Table = ({ rows, showReconcile }) => (
     <div style={{ overflowX: "auto" }}>
@@ -40,7 +53,31 @@ const AdminWallet = () => {
               <td style={td}>{t.user}</td>
               <td style={td}>{t.type}</td>
               <td style={{ ...td, fontFamily: "var(--font-mono)", fontWeight: 700 }}>{formatINR(t.amount)}</td>
-              <td style={{ ...td, color: statusColor(t.status), fontWeight: 700, fontSize: 12 }}>{t.status}</td>
+              <td style={td}>
+                {showReconcile ? (
+                  <span style={{ color: statusColor(t.status), fontWeight: 700, fontSize: 12 }}>{t.status}</span>
+                ) : (
+                  <select
+                    value={t.status}
+                    onChange={(e) => askChangeStatus(t, e.target.value)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      border: "1px solid var(--border)",
+                      background: "rgba(255,255,255,0.04)",
+                      color: statusColor(t.status),
+                      outline: "none"
+                    }}
+                  >
+                    <option value="PENDING" style={optionStyle}>PENDING</option>
+                    <option value="SUCCESS" style={optionStyle}>SUCCESS</option>
+                    <option value="FAILED" style={optionStyle}>FAILED</option>
+                  </select>
+                )}
+              </td>
               <td style={{ ...td, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)" }}>{t.razorpayOrderId}</td>
               <td style={td}>{fmtDate(t.date)}</td>
               {showReconcile && (
@@ -55,6 +92,9 @@ const AdminWallet = () => {
       </table>
     </div>
   );
+
+  if (error) return <div className="glass-card p-5" style={{ color: "#EF4444" }}>{error}</div>;
+  if (!data) return <div className="glass-card p-5" style={{ color: "var(--text-dim)" }}>Loading…</div>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
