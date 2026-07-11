@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const AdminDashboard = () => {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -11,7 +13,7 @@ const AdminDashboard = () => {
 
   const fetchPendingUsers = async () => {
     try {
-      const { data } = await axios.get("http://localhost:3002/api/admin/pending-users", {
+      const { data } = await axios.get(`${API_URL}/api/admin/pending-users`, {
         withCredentials: true,
       });
       if (data.success) {
@@ -27,7 +29,7 @@ const AdminDashboard = () => {
 
   const handleApprove = async (userId) => {
     try {
-      await axios.post(`http://localhost:3002/api/admin/approve-user/${userId}`, {}, {
+      await axios.post(`${API_URL}/api/admin/approve-user/${userId}`, {}, {
         withCredentials: true,
       });
       fetchPendingUsers(); 
@@ -39,7 +41,7 @@ const AdminDashboard = () => {
   const handleReject = async (userId) => {
     if(window.confirm("Are you sure you want to reject and delete this user?")) {
       try {
-        await axios.delete(`http://localhost:3002/api/admin/reject-user/${userId}`, {
+        await axios.delete(`${API_URL}/api/admin/reject-user/${userId}`, {
           withCredentials: true,
         });
         fetchPendingUsers(); 

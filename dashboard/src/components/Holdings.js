@@ -14,6 +14,8 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value);
 };
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const Holdings = () => {
   const [allHoldings, setAllHoldings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +28,7 @@ const Holdings = () => {
   useEffect(() => {
     const fetchHoldings = async () => {
       try {
-        const res = await axios.get("http://localhost:3002/allHoldings");
+        const res = await axios.get(`${API_URL}/allHoldings`);
         setAllHoldings(res.data || []);
       } catch (err) {
         console.error("Error fetching holdings:", err);

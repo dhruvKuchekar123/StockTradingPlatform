@@ -10,6 +10,8 @@ const formatINR = (value) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value);
 };
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const Funds = () => {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
@@ -25,12 +27,12 @@ const Funds = () => {
 
   const fetchWalletDetails = async () => {
     try {
-      const balanceRes = await axios.get("http://localhost:3002/api/wallet/balance", { withCredentials: true });
+      const balanceRes = await axios.get(`${API_URL}/api/wallet/balance`, { withCredentials: true });
       if (balanceRes.data.success) {
         setBalance(balanceRes.data.balance || 0);
       }
       
-      const txRes = await axios.get("http://localhost:3002/api/wallet/transactions", { withCredentials: true });
+      const txRes = await axios.get(`${API_URL}/api/wallet/transactions`, { withCredentials: true });
       if (txRes.data.success) {
         setTransactions(txRes.data.transactions || []);
       }
@@ -72,7 +74,7 @@ const Funds = () => {
 
     try {
       // 1. Create order on backend
-      const { data } = await axios.post("http://localhost:3002/api/wallet/create-order", {
+      const { data } = await axios.post(`${API_URL}/api/wallet/create-order`, {
         amount: numericAmount
       }, { withCredentials: true });
 
@@ -98,7 +100,7 @@ const Funds = () => {
     setStatusType("info");
     setStatusMessage("Simulating payment verification...");
     try {
-      const verifyRes = await axios.post("http://localhost:3002/api/wallet/verify-payment", {
+      const verifyRes = await axios.post(`${API_URL}/api/wallet/verify-payment`, {
         razorpay_order_id: createdOrderId,
         razorpay_payment_id: "pay_demo_" + Math.random().toString(36).substr(2, 9),
         razorpay_signature: "mock_signature"

@@ -3,7 +3,7 @@ const axios = require('axios');
     try {
         console.log("Logging in...");
         const loginRes = await axios.post("http://localhost:3002/login", {
-            email: "dummyuser@gmail.com", password: "Password123"
+            email: "dummyuser@gmail.com", password: "password123"
         });
         const cookie = loginRes.headers['set-cookie'];
         
