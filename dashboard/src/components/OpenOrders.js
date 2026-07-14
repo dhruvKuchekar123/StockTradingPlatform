@@ -12,6 +12,8 @@ const statusColors = {
   REJECTED: "error"
 };
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const OpenOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,7 +21,7 @@ const OpenOrders = () => {
 
   const fetchOpenOrders = async () => {
     try {
-      const res = await axios.get("http://localhost:3002/api/orders/open", { withCredentials: true });
+      const res = await axios.get(`${API_URL}/api/orders/open`, { withCredentials: true });
       if (res.data.success) {
         setOrders(res.data.orders);
       }
@@ -48,7 +50,7 @@ const OpenOrders = () => {
 
   const handleCancel = async (orderId) => {
     try {
-      await axios.delete(`http://localhost:3002/api/orders/${orderId}`, { withCredentials: true });
+      await axios.delete(`${API_URL}/api/orders/${orderId}`, { withCredentials: true });
       setOrders(prev => prev.filter(o => o._id !== orderId));
     } catch (err) {
       alert("Failed to cancel order: " + (err.response?.data?.message || err.message));

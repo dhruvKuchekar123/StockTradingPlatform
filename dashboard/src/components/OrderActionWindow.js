@@ -11,6 +11,8 @@ import { motion } from "framer-motion";
 import "./BuyActionWindow.css"; 
 import usePriceFeed from "../hooks/usePriceFeed";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const OrderActionWindow = ({ uid, mode: initialMode }) => {
   const { closeOrderWindow } = useContext(GeneralContext);
   const navigate = useNavigate();
@@ -45,7 +47,7 @@ const OrderActionWindow = ({ uid, mode: initialMode }) => {
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        const { data } = await axios.get("http://localhost:3002/api/wallet/balance", { withCredentials: true });
+        const { data } = await axios.get(`${API_URL}/api/wallet/balance`, { withCredentials: true });
         if (data.success) {
           setWalletBalance(data.balance || 0);
         }
@@ -94,7 +96,7 @@ const OrderActionWindow = ({ uid, mode: initialMode }) => {
             idempotencyKey
         };
 
-        const { data } = await axios.post("http://localhost:3002/api/orders/place", payload, { withCredentials: true });
+        const { data } = await axios.post(`${API_URL}/api/orders/place`, payload, { withCredentials: true });
         
         if (data.success) {
             showSuccess();

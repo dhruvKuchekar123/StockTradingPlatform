@@ -5,6 +5,8 @@ import {
   TablePagination, TextField, MenuItem, Button 
 } from "@mui/material";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(0); // MUI uses 0-indexed page
@@ -18,7 +20,7 @@ const OrderHistory = () => {
   const fetchHistory = async () => {
     try {
       // Backend uses 1-indexed page
-      const res = await axios.get(`http://localhost:3002/api/orders/history`, {
+      const res = await axios.get(`${API_URL}/api/orders/history`, {
         params: {
           page: page + 1,
           limit: rowsPerPage,

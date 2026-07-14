@@ -16,13 +16,15 @@ const sentimentConfig = {
   neutral: { icon: Minus, badge: "badge-neutral", label: "Neutral" },
 };
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const Summary = () => {
   const [balance, setBalance] = useState(0);
   const { selectedStock } = useContext(GeneralContext);
 
   const fetchProfile = async () => {
     try {
-      const { data } = await axios.get("http://localhost:3002/api/user/profile", { withCredentials: true });
+      const { data } = await axios.get(`${API_URL}/api/user/profile`, { withCredentials: true });
       if (data.success) {
         setBalance(data.walletBalance || 0);
       }

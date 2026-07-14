@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Cookies from "js-cookie";
 import "./App.css";
-
-const API_BASE_URL = "http://localhost:3002";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
 const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3001";
 
 const marketItems = [

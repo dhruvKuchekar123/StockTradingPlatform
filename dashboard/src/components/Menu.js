@@ -17,6 +17,8 @@ import {
   Brain
 } from "lucide-react";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
+
 const Menu = ({ username }) => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [openOrderCount, setOpenOrderCount] = useState(0);
@@ -25,7 +27,7 @@ const Menu = ({ username }) => {
   useEffect(() => {
     const fetchOpenOrders = async () => {
       try {
-        const res = await axios.get("http://localhost:3002/api/orders/open", { withCredentials: true });
+        const res = await axios.get(`${API_URL}/api/orders/open`, { withCredentials: true });
         if (res.data.success) {
           setOpenOrderCount(res.data.orders.length);
         }
@@ -45,7 +47,7 @@ const Menu = ({ username }) => {
 
     // 2. Fire-and-forget backend cookie clear (don't await — redirect immediately)
     try {
-      fetch("http://localhost:3002/logout", {
+      fetch(`${API_URL}/logout`, {
         method: "POST",
         credentials: "include",
       }).catch(() => {}); // Silently ignore network errors
