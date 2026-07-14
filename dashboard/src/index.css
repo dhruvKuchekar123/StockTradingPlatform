@@ -773,7 +773,8 @@ h1, h2, h3 {
   -webkit-backdrop-filter: blur(16px);
   border-radius: 16px;
   border: 1px solid var(--glass-border);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin-top: 20px;
   animation: slideUp 0.5s ease-out forwards;
 }
@@ -1557,6 +1558,19 @@ tr:last-child td {
   }
   .brand-logo span {
     display: none !important;
+  }
+  .menu-container {
+    gap: 2px;
+    max-width: calc(100vw - 120px);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .menu-container::-webkit-scrollbar {
+    display: none;
+  }
+  .menu-item {
+    padding: 6px 8px;
   }
 }
 
