@@ -103,7 +103,8 @@ const Funds = () => {
       const verifyRes = await axios.post(`${API_URL}/api/wallet/verify-payment`, {
         razorpay_order_id: createdOrderId,
         razorpay_payment_id: "pay_demo_" + Math.random().toString(36).substr(2, 9),
-        razorpay_signature: "mock_signature"
+        razorpay_signature: "mock_signature",
+        amount: depositAmount
       }, { withCredentials: true });
 
       if (verifyRes.data.success) {
