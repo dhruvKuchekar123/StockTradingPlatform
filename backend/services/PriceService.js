@@ -8,10 +8,15 @@ const WARNING_COOLDOWN = 300000; // 5 minutes
 const PROVIDER = process.env.PRICE_PROVIDER || "yahoo";
 const ALPHA_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 
+const INDIAN_STOCKS = new Set([
+    "RELIANCE", "TCS", "ICICIBANK", "INFY", "SBIN", "HDFCBANK", "TATAMOTORS", "ITC", "BHARTIARTL"
+]);
+
 // Normalize symbols for Yahoo Finance (Indian stocks need .NS suffix)
 const normalizeSymbol = (symbol, provider) => {
     if (provider === "yahoo") {
-        if (!symbol.includes(".")) {
+        const upper = symbol.toUpperCase();
+        if (INDIAN_STOCKS.has(upper) && !symbol.includes(".")) {
             return `${symbol}.NS`;
         }
     }
@@ -61,16 +66,22 @@ const fetchAlphaVantagePrice = async (symbol) => {
 const fetchYahooPrice = async (symbol) => {
     try {
         const querySymbol = normalizeSymbol(symbol, "yahoo");
-        const quote = await yahooFinance.quote(querySymbol, {
-            fields: ['regularMarketPrice', 'regularMarketChange', 'regularMarketChangePercent']
-        });
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${querySymbol}`;
+        const res = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         
-        if (quote && quote.regularMarketPrice) {
+        const result = res.data?.chart?.result?.[0];
+        if (result && result.meta) {
+            const meta = result.meta;
+            const price = meta.regularMarketPrice;
+            const prevClose = meta.previousClose || price;
+            const change = parseFloat((price - prevClose).toFixed(2));
+            const changePercent = parseFloat(((change / prevClose) * 100).toFixed(2));
+            
             return {
-                symbol, // return original symbol, not .NS
-                price: quote.regularMarketPrice,
-                change: quote.regularMarketChange,
-                changePercent: quote.regularMarketChangePercent,
+                symbol,
+                price,
+                change,
+                changePercent,
                 timestamp: Date.now(),
                 isMockData: false
             };
@@ -79,7 +90,7 @@ const fetchYahooPrice = async (symbol) => {
     } catch (error) {
         const now = Date.now();
         if (now - lastYahooWarningTime > WARNING_COOLDOWN) {
-            console.warn(`[Yahoo Finance] API is rate-limited or unavailable (suppressing warnings for 5m). Error: ${error.message}`);
+            console.warn(`[Yahoo Finance v8] API error for ${symbol} (suppressing warnings for 5m). Error: ${error.message}`);
             lastYahooWarningTime = now;
         }
         return fetchMockPrice(symbol);
