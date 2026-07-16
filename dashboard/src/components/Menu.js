@@ -68,6 +68,7 @@ const Menu = ({ username }) => {
     { name: "Analytics", path: "/analytics", icon: Layers, id: "menu-analytics" },
     { name: "News", path: "/news", icon: Newspaper, id: "menu-news" },
     { name: "AI", path: "/ai-insights", icon: Brain, id: "menu-ai" },
+    { name: "Admin", path: "/admin", icon: Shield, id: "menu-admin" },
   ];
 
   return (
