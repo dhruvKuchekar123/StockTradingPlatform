@@ -55,7 +55,7 @@ const Menu = ({ username }) => {
 
     // 3. Redirect to login with logout=true flag so Login.js won't auto-redirect back
     window.location.replace(
-      `${process.env.REACT_APP_FRONTEND_URL || "http://localhost:3005"}/login?logout=true`
+      `${process.env.REACT_APP_FRONTEND_URL || "http://localhost:3000"}/login?logout=true`
     );
   };
 

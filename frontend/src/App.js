@@ -3,7 +3,7 @@ import axios from "axios";
 import Cookies from "js-cookie";
 import "./App.css";
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
-const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3001";
+const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3005";
 
 const marketItems = [
   ["NIFTY", "24,782.10", "+0.82%"],

@@ -6,7 +6,7 @@ import { useNotifications } from "./NotificationContext";
 import usePriceFeed from "../hooks/usePriceFeed";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
-const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || "http://localhost:3005";
+const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || "http://localhost:3000";
 
 // Global auto-logout on any 401/403 response
 const setupAxiosInterceptors = (frontendUrl) => {

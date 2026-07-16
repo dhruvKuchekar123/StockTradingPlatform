@@ -7,7 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import "./Auth.css";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
-const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3001";
+const DASHBOARD_URL = process.env.REACT_APP_DASHBOARD_URL || "http://localhost:3005";
 
 const Login = () => {
   const navigate = useNavigate();

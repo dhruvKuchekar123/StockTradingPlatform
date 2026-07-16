@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
-const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || "http://localhost:3005";
+const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || "http://localhost:3000";
 
 const Profile = () => {
   const [user, setUser] = useState(null);

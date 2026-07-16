@@ -328,13 +328,17 @@ module.exports.ForgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3005"}/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password/${resetToken}`;
     const emailHtml = `
       <h1>Reset Password</h1>
       <p>Click the link below to reset your StockFlow password:</p>
       <a href="${resetUrl}">${resetUrl}</a>
     `;
-    await sendEmail(email, "Password Reset - StockFlow", emailHtml);
+    const emailSent = await sendEmail(email, "Password Reset - StockFlow", emailHtml);
+
+    if (!emailSent) {
+      return res.status(500).json({ message: "Failed to send password reset link. Please check your email configuration.", success: false });
+    }
 
     res.json({ message: "Password reset link sent to your email", success: true });
   } catch (error) {

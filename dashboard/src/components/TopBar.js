@@ -5,7 +5,7 @@ import NotificationBell from "./NotificationBell";
 import { TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { marketIndices } from "../data/data";
 
-const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || "http://localhost:3005";
+const FRONTEND_URL = process.env.REACT_APP_FRONTEND_URL || "http://localhost:3000";
 
 const TopBar = ({ username }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
