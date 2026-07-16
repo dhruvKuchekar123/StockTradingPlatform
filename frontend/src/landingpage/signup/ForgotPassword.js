@@ -20,7 +20,8 @@ const ForgotPassword = () => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error("An error occurred");
+      const msg = error.response?.data?.message || "An error occurred";
+      toast.error(msg);
     }
   };
 

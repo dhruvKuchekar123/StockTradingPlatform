@@ -329,6 +329,7 @@ module.exports.ForgotPassword = async (req, res) => {
     await user.save();
 
     const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reset-password/${resetToken}`;
+    console.log(`[PASSWORD RESET] Generated reset URL for ${email}: ${resetUrl}`);
     const emailHtml = `
       <h1>Reset Password</h1>
       <p>Click the link below to reset your StockFlow password:</p>
