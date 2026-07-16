@@ -83,7 +83,7 @@ module.exports.GoogleLogin = async (req, res, next) => {
     }
 
     user.lastLogin = new Date();
-    await user.save();
+    user.save().catch(err => console.error("Failed to save lastLogin for Google login:", err.message));
 
     const secretToken = createSecretToken(user._id);
     res.cookie("token", secretToken, {
@@ -437,7 +437,7 @@ module.exports.Login = async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Your account has been suspended. Please contact support." });
     }
     user.lastLogin = new Date();
-    await user.save();
+    user.save().catch(err => console.error("Failed to save lastLogin for credentials login:", err.message));
 
     const token = createSecretToken(user._id);
     res.cookie("token", token, {

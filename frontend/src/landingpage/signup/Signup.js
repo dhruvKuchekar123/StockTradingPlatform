@@ -138,7 +138,7 @@ const Signup = () => {
         handleSuccess(data.message);
         setTimeout(() => {
           navigate("/login");
-        }, 1500);
+        }, 200);
       } else {
         handleError(data.message || "OTP verification failed");
         setIsVerifying(false);
@@ -300,7 +300,7 @@ const Signup = () => {
                         handleSuccess(data.message);
                         setTimeout(() => {
                           window.location.href = `${DASHBOARD_URL}/?token=${data.token || ""}`;
-                        }, 1000);
+                        }, 150);
                       } else {
                         handleError(data.message);
                       }

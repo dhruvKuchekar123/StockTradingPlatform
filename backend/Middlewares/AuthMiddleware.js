@@ -2,6 +2,28 @@ const User = require("../model/UserModel");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 
+const userCache = new Map();
+const CACHE_TTL = 5000; // 5 seconds is perfect to deduplicate concurrent requests on page load
+
+async function getCachedUser(id, includeSensitive = false) {
+  const cacheKey = `${id}_${includeSensitive}`;
+  const cached = userCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && (now - cached.timestamp < CACHE_TTL)) {
+    return cached.user;
+  }
+  
+  let query = User.findById(id);
+  if (!includeSensitive) {
+    query = query.select("-password -signupOTP -resetPasswordToken -verificationToken");
+  }
+  const user = await query;
+  if (user) {
+    userCache.set(cacheKey, { user, timestamp: now });
+  }
+  return user;
+}
+
 module.exports.userVerification = (req, res, next) => {
   let token = req.cookies.token;
   if (!token && req.headers.authorization) {
@@ -17,7 +39,7 @@ module.exports.userVerification = (req, res, next) => {
     if (err) {
       return res.status(401).json({ status: false, message: "Invalid or expired token" });
     }
-    const user = await User.findById(data.id).select("-password -signupOTP -resetPasswordToken -verificationToken");
+    const user = await getCachedUser(data.id, false);
     if (user) {
       req.user = user;
       next();
@@ -41,7 +63,7 @@ module.exports.adminVerification = (req, res, next) => {
   jwt.verify(token, process.env.TOKEN_KEY, async (err, data) => {
     if (err) return res.status(401).json({ status: false, message: "Token verification failed" });
     
-    const user = await User.findById(data.id);
+    const user = await getCachedUser(data.id, false);
     if (user && user.role === "admin") {
       req.user = user;
       next();
@@ -77,7 +99,7 @@ module.exports.checkUserStatus = (req, res) => {
   if (!token) return res.json({ status: false });
   jwt.verify(token, process.env.TOKEN_KEY, async (err, data) => {
     if (err) return res.json({ status: false });
-    const user = await User.findById(data.id);
+    const user = await getCachedUser(data.id, false);
     if (user) {
       if (user.suspended) {
         return res.json({ status: false, code: "SUSPENDED", message: "Your account has been suspended. Please contact support." });

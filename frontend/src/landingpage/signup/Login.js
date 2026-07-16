@@ -95,7 +95,7 @@ const Login = () => {
         handleSuccess(message);
         setTimeout(() => {
           window.location.href = `${DASHBOARD_URL}/?token=${data.token || ""}`;
-        }, 1000);
+        }, 150);
       } else {
         handleError(message);
         setIsLoading(false);
@@ -172,7 +172,7 @@ const Login = () => {
                     handleSuccess(data.message);
                     setTimeout(() => {
                       window.location.href = `${DASHBOARD_URL}/?token=${data.token || ""}`;
-                    }, 1000);
+                    }, 150);
                   } else {
                     handleError(data.message);
                   }
