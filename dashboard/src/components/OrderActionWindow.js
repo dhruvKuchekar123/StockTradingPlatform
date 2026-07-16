@@ -399,7 +399,7 @@ const OrderActionWindow = ({ uid, mode: initialMode }) => {
                   fontFamily: "var(--font-body)",
                 }}
             >
-                {isLoading ? <CircularProgress size={22} color="inherit" /> : `Place ${side} Order`}
+                {isLoading ? <CircularProgress size={22} color="inherit" /> : side === "BUY" ? "Buy" : "Sell"}
             </button>
         )}
       </div>

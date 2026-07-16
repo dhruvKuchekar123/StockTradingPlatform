@@ -367,7 +367,7 @@ const Funds = () => {
                         transition: "all 0.3s ease",
                       }}
                     >
-                      {loading ? "Verifying..." : "Approve Payment"}
+                      {loading ? "Verifying..." : "Success"}
                     </button>
                     <button
                       onClick={() => {
@@ -474,7 +474,7 @@ const Funds = () => {
                       gap: "8px"
                     }}
                   >
-                    {loading ? "Processing..." : "Add Funds (Demo Gateway)"}
+                    {loading ? "Processing..." : "Deposit"}
                   </button>
                 </form>
               )}
