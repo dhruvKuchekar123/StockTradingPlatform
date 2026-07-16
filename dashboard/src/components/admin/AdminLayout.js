@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import axios from "axios";
 import { Users, ClipboardList, Wallet, Activity, Mail, ScrollText, ShieldAlert, Loader2 } from "lucide-react";
 
-const AUTH_HOST = process.env.REACT_APP_API_HOST || "http://localhost:3002";
+const AUTH_HOST = process.env.REACT_APP_API_URL || process.env.REACT_APP_API_HOST || "http://localhost:3002";
 
 // Read-only admin console shell: verifies the caller is an admin (server is the
 // source of truth — this is just so non-admins see a clean message instead of
