@@ -2,6 +2,9 @@ const axios = require("axios");
 const yahooFinance = require("yahoo-finance2").default;
 const { MOCK_BASE_PRICES } = require("../config/constants");
 
+let lastYahooWarningTime = 0;
+const WARNING_COOLDOWN = 300000; // 5 minutes
+
 const PROVIDER = process.env.PRICE_PROVIDER || "yahoo";
 const ALPHA_KEY = process.env.ALPHA_VANTAGE_API_KEY;
 
@@ -74,7 +77,11 @@ const fetchYahooPrice = async (symbol) => {
         }
         return fetchMockPrice(symbol);
     } catch (error) {
-        console.warn(`Yahoo Finance Error for ${symbol}: ${error.message}. Falling back to mock price.`);
+        const now = Date.now();
+        if (now - lastYahooWarningTime > WARNING_COOLDOWN) {
+            console.warn(`[Yahoo Finance] API is rate-limited or unavailable (suppressing warnings for 5m). Error: ${error.message}`);
+            lastYahooWarningTime = now;
+        }
         return fetchMockPrice(symbol);
     }
 };

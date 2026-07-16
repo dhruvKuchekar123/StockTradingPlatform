@@ -5,12 +5,20 @@ const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 let client = null;
 let isConnected = false;
 
+let lastLoggedError = null;
+let lastLoggedErrorTime = 0;
+
 const initCache = async () => {
     client = createClient({ url: REDIS_URL });
 
     client.on("error", (err) => {
-        console.error("[Redis] Error:", err.message);
         isConnected = false;
+        const now = Date.now();
+        if (err.message !== lastLoggedError || (now - lastLoggedErrorTime > 300000)) {
+            console.error("[Redis] Connection error (suppressed for 5m):", err.message);
+            lastLoggedError = err.message;
+            lastLoggedErrorTime = now;
+        }
     });
 
     client.on("connect", () => {
