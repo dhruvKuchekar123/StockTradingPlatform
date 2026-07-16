@@ -1503,31 +1503,31 @@ tr:last-child td {
    RESPONSIVE
    ═══════════════════════════════ */
 
-@media (max-width: 1350px) {
+@media (max-width: 1380px) {
   .indices-container {
-    gap: 12px;
+    display: none !important;
   }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1250px) {
   .watchlist-container {
     width: 300px;
     min-width: 300px;
   }
-  .indices-container {
+  .market-clock, .market-status {
     display: none !important;
   }
 }
 
-@media (max-width: 1000px) {
-  .market-clock, .market-status, .notification-bell {
-    display: none !important;
-  }
+@media (max-width: 1120px) {
   .menu-item span {
     display: none !important;
   }
   .menu-item {
-    padding: 8px 10px;
+    padding: 8px 12px;
+  }
+  .notification-bell {
+    display: none !important;
   }
 }
 
