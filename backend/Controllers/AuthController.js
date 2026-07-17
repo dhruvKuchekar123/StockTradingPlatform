@@ -1,9 +1,9 @@
 const User = require("../model/UserModel");
 const { createSecretToken } = require("../util/SecretToken");
 const bcrypt = require("bcryptjs");
-const { OAuth2Client } = require("google-auth-library");
 const crypto = require("crypto");
-const { sendEmail, sendOTPEmail } = require("../util/EmailService");
+const { OAuth2Client } = require("google-auth-library");
+const { sendEmail, sendOTPEmail, sendRegistrationReceiptEmail } = require("../util/EmailService");
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 if (!GOOGLE_CLIENT_ID) {
@@ -286,6 +286,15 @@ module.exports.VerifyOTP = async (req, res) => {
     user.signupOTPExpires = undefined;
     user.otpAttempts = 0;
     await user.save();
+
+    // Send registration & KYC receipt email after a 10-second delay
+    setTimeout(async () => {
+      try {
+        await sendRegistrationReceiptEmail(user.email, user.username, user.bankDetails);
+      } catch (err) {
+        console.error("[Email] Failed to send registration receipt email:", err.message);
+      }
+    }, 10000); // 10 seconds delay
 
     return res.json({ success: true, message: "Email verified successfully!" });
   } catch (error) {

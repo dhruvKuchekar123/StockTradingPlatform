@@ -24,6 +24,8 @@ const Signup = () => {
   const [showOTP, setShowOTP] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
 
   const { email, password, username, accountName, accountNumber, ifscCode, bankName } = inputValue;
 
@@ -203,6 +205,7 @@ const Signup = () => {
                   value={email}
                   placeholder="Enter your email"
                   onChange={handleOnChange}
+                  autoComplete="new-email"
                   required
                 />
               </div>
@@ -214,19 +217,31 @@ const Signup = () => {
                   value={username}
                   placeholder="Enter your username"
                   onChange={handleOnChange}
+                  autoComplete="new-username"
                   required
                 />
               </div>
               <div className="auth-field">
                 <label>Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={password}
-                  placeholder="Enter your password (min 6 characters)"
-                  onChange={handleOnChange}
-                  required
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={password}
+                    placeholder="Enter your password (min 6 characters)"
+                    onChange={handleOnChange}
+                    autoComplete="new-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <i className={showPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye"}></i>
+                  </button>
+                </div>
               </div>
 
               <div className="auth-divider" />
@@ -240,6 +255,7 @@ const Signup = () => {
                   value={accountName} 
                   placeholder="Enter account holder name" 
                   onChange={handleOnChange} 
+                  autoComplete="off"
                   required 
                 />
               </div>
@@ -252,6 +268,7 @@ const Signup = () => {
                     value={accountNumber} 
                     placeholder="Enter account number" 
                     onChange={handleOnChange} 
+                    autoComplete="off"
                     required 
                   />
                 </div>
@@ -264,6 +281,7 @@ const Signup = () => {
                     placeholder="Enter IFSC code" 
                     onChange={handleOnChange} 
                     style={{ textTransform: "uppercase" }}
+                    autoComplete="off"
                     required 
                   />
                 </div>
@@ -276,6 +294,7 @@ const Signup = () => {
                   value={bankName} 
                   placeholder="Enter bank name" 
                   onChange={handleOnChange} 
+                  autoComplete="off"
                   required 
                 />
               </div>

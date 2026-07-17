@@ -13,6 +13,20 @@ import usePriceFeed from "../hooks/usePriceFeed";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 const OrderActionWindow = ({ uid, mode: initialMode }) => {
   const { closeOrderWindow } = useContext(GeneralContext);
   const navigate = useNavigate();
@@ -43,6 +57,12 @@ const OrderActionWindow = ({ uid, mode: initialMode }) => {
   const [walletBalance, setWalletBalance] = useState(0); 
   const [availableQty, setAvailableQty] = useState(10); 
   const [idempotencyKey, setIdempotencyKey] = useState("");
+
+  const [paymentMethod, setPaymentMethod] = useState("WALLET");
+  const [showGatewaySimulator, setShowGatewaySimulator] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState("");
+  const [razorpayKey, setRazorpayKey] = useState("");
+  const [razorpayAmount, setRazorpayAmount] = useState(0);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -78,10 +98,108 @@ const OrderActionWindow = ({ uid, mode: initialMode }) => {
     if (newValue) setOrderType(newValue);
   };
 
+  const verifyAndExecuteRazorpayBuy = async (orderId, paymentId, signature) => {
+    setIsLoading(true);
+    setErrorMsg("");
+    try {
+      const { data } = await axios.post(`${API_URL}/api/payment/verify-and-buy`, {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature,
+        symbol: uid,
+        qty,
+        price: orderType === 'MARKET' ? ltp : limitPrice
+      }, { withCredentials: true });
+
+      if (data.success) {
+        showSuccess();
+      } else {
+        setErrorMsg(data.message || "Direct purchase verification failed.");
+        setIsLoading(false);
+      }
+    } catch (error) {
+      setErrorMsg(error.response?.data?.message || error.message || "Direct purchase verification failed.");
+      setIsLoading(false);
+    }
+  };
+
+  const handleSimulatePaymentAndBuy = async () => {
+    await verifyAndExecuteRazorpayBuy(
+      createdOrderId,
+      "pay_demo_" + Math.random().toString(36).substr(2, 9),
+      "mock_signature"
+    );
+    setShowGatewaySimulator(false);
+  };
+
   const submitOrder = async () => {
     setErrorMsg("");
     setIsLoading(true);
 
+    if (paymentMethod === "RAZORPAY") {
+      try {
+        // Direct purchase using Razorpay Gateway!
+        // 1. Create trade order on backend
+        const { data } = await axios.post(`${API_URL}/api/payment/create-order`, {
+          symbol: uid,
+          qty,
+          price: orderType === 'MARKET' ? ltp : limitPrice
+        }, { withCredentials: true });
+
+        if (!data.success) {
+          throw new Error(data.message || "Failed to initiate payment.");
+        }
+
+        setCreatedOrderId(data.order.id);
+        setRazorpayKey(data.razorpay_key);
+        setRazorpayAmount(data.order.amount);
+
+        if (data.order.id.startsWith("order_demo_")) {
+          setShowGatewaySimulator(true);
+          setIsLoading(false);
+        } else {
+          // Real Razorpay payment
+          const resLoaded = await loadRazorpayScript();
+          if (!resLoaded) {
+            throw new Error("Failed to load Razorpay SDK. Please check your connection.");
+          }
+
+          const options = {
+            key: data.razorpay_key,
+            amount: data.order.amount,
+            currency: data.order.currency,
+            name: "StockFlow Pro",
+            description: `Purchase of ${qty} ${uid} shares`,
+            order_id: data.order.id,
+            handler: async function (response) {
+              await verifyAndExecuteRazorpayBuy(
+                response.razorpay_order_id,
+                response.razorpay_payment_id,
+                response.razorpay_signature
+              );
+            },
+            theme: {
+              color: "#D4AF37",
+            },
+            modal: {
+              ondismiss: function () {
+                setIsLoading(false);
+                setErrorMsg("Payment cancelled.");
+              }
+            }
+          };
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+          setIsLoading(false);
+        }
+      } catch (error) {
+        setErrorMsg(error.response?.data?.message || error.message || "Payment initiation failed.");
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Default Wallet Balance flow
     try {
         // --- Place order using internal wallet balance ---
         const payload = {
@@ -121,10 +239,108 @@ const OrderActionWindow = ({ uid, mode: initialMode }) => {
   const estTotal = orderType === 'MARKET' ? (qty * ltp) : (qty * limitPrice);
   const fee = 20.00; // Flat ₹20 transaction fee
   const totalCost = estTotal + fee;
-  const isInsufficient = isBuy && (walletBalance < totalCost);
+  const isInsufficient = isBuy && paymentMethod === "WALLET" && (walletBalance < totalCost);
 
   const accentColor = isBuy ? "#D4AF37" : "#EF4444";
   const accentBg = isBuy ? "linear-gradient(135deg, #D4AF37, #E8C547)" : "linear-gradient(135deg, #EF4444, #F87171)";
+
+  if (showGatewaySimulator) {
+    return (
+      <div className="buy-window-container" id="buy-window" style={{ 
+        borderColor: accentColor,
+        boxShadow: `0 24px 64px rgba(0, 0, 0, 0.5), 0 0 40px ${isBuy ? 'rgba(212,175,55,0.1)' : 'rgba(239,68,68,0.1)'}`,
+        width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto'
+      }}>
+        <div className="buy-window-header" style={{ 
+          background: accentBg,
+          color: isBuy ? "#0F1117" : "white",
+        }}>
+          <div className="flex items-center gap-2">
+            {isBuy ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+            <h3 className="m-0">Gateway Simulator</h3>
+          </div>
+          <X className="cursor-pointer" size={20} onClick={() => { setShowGatewaySimulator(false); setIsLoading(false); }} style={{ opacity: 0.8 }} />
+        </div>
+        <div className="buy-window-content p-4" style={{ color: "var(--text-main)" }}>
+          <div style={{ 
+            padding: "16px", 
+            borderRadius: "10px", 
+            backgroundColor: "rgba(212,175,55,0.05)", 
+            border: "1px solid rgba(212,175,55,0.2)",
+            marginBottom: "20px"
+          }}>
+            <div className="flex justify-between items-center mb-3">
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--accent-gold)", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "4px" }}>
+                STOCKFLOW SECURE MOCK
+              </span>
+              <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>OFFLINE TESTWAY</span>
+            </div>
+            <div style={{ marginBottom: "12px" }}>
+              <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>Purchase Amount</span>
+              <div style={{ fontSize: "24px", fontWeight: 800, color: "#fff", fontFamily: "var(--font-mono)", marginTop: "4px" }}>
+                ₹{((razorpayAmount || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div>
+              <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>Mock Order ID</span>
+              <div style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-dim)", marginTop: "4px" }}>
+                {createdOrderId}
+              </div>
+            </div>
+          </div>
+
+          {isLoading && (
+            <div style={{ color: "var(--accent-gold)", fontSize: "13px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <CircularProgress size={16} color="inherit" />
+              <span>Verifying and executing stock purchase...</span>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button
+              onClick={handleSimulatePaymentAndBuy}
+              disabled={isLoading}
+              style={{
+                flex: 1,
+                padding: "12px",
+                borderRadius: "8px",
+                border: "none",
+                backgroundColor: "#10B981",
+                color: "#0F1117",
+                fontWeight: 700,
+                cursor: isLoading ? "default" : "pointer",
+                opacity: isLoading ? 0.6 : 1,
+                transition: "all 0.3s ease",
+              }}
+            >
+              Success
+            </button>
+            <button
+              onClick={() => {
+                setShowGatewaySimulator(false);
+                setIsLoading(false);
+              }}
+              disabled={isLoading}
+              style={{
+                flex: 1,
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid var(--border)",
+                backgroundColor: "transparent",
+                color: "var(--text-main)",
+                fontWeight: 700,
+                cursor: isLoading ? "default" : "pointer",
+                opacity: isLoading ? 0.6 : 1,
+                transition: "all 0.3s ease",
+              }}
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="buy-window-container" id="buy-window" style={{ 
@@ -305,6 +521,25 @@ const OrderActionWindow = ({ uid, mode: initialMode }) => {
                     If {uid} crosses ₹{triggerPrice} → {isBuy ? 'Buy' : 'Sell'} {qty} shares at ₹{limitPrice}. Valid until: {new Date(gttExpiry).toLocaleDateString()}
                 </div>
             </div>
+        )}
+
+        {/* PAYMENT METHOD (Only for BUY side) */}
+        {isBuy && (
+          <FormControl fullWidth className="mb-4">
+              <InputLabel style={{ color: 'var(--text-dim)' }}>Payment Method</InputLabel>
+              <Select
+                  value={paymentMethod}
+                  label="Payment Method"
+                  onChange={e => {
+                    setPaymentMethod(e.target.value);
+                    setErrorMsg("");
+                  }}
+                  style={{ color: '#fff', border: '1px solid var(--border)' }}
+              >
+                  <MenuItem value="WALLET">Wallet Balance (₹{walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })})</MenuItem>
+                  <MenuItem value="RAZORPAY">Razorpay Gateway (UPI, Netbanking, Cards)</MenuItem>
+              </Select>
+          </FormControl>
         )}
 
         {/* Summary & Submit */}

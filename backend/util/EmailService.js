@@ -216,3 +216,57 @@ module.exports.sendOTPEmail = async (to, otp) => {
     const { success } = await deliver(mailOptions, "OTP");
     return success;
 };
+
+module.exports.sendRegistrationReceiptEmail = async (to, username, bankDetails) => {
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2bd2f; border-radius: 12px; max-width: 500px; background-color: #06080c; color: #ffffff;">
+        <h2 style="color: #e2bd2f; border-bottom: 1px solid rgba(226,189,47,0.3); padding-bottom: 10px;">StockFlow Pro - Account & KYC Receipt</h2>
+        <p style="color: #9aa3b5; font-size: 14px;">Your account has been successfully verified! Below are your registration and KYC receipt details:</p>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px; color: #ffffff;">
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <td style="padding: 10px 0; color: #9aa3b5;"><strong>Username</strong></td>
+            <td style="padding: 10px 0; text-align: right; font-weight: bold;">${username}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <td style="padding: 10px 0; color: #9aa3b5;"><strong>Email Address</strong></td>
+            <td style="padding: 10px 0; text-align: right; font-weight: bold;">${to}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <td style="padding: 10px 0; color: #9aa3b5;"><strong>Account Holder Name</strong></td>
+            <td style="padding: 10px 0; text-align: right;">${bankDetails?.accountName || "N/A"}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <td style="padding: 10px 0; color: #9aa3b5;"><strong>Account Number</strong></td>
+            <td style="padding: 10px 0; text-align: right;">${bankDetails?.accountNumber || "N/A"}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <td style="padding: 10px 0; color: #9aa3b5;"><strong>Bank Name</strong></td>
+            <td style="padding: 10px 0; text-align: right;">${bankDetails?.bankName || "N/A"}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <td style="padding: 10px 0; color: #9aa3b5;"><strong>IFSC Code</strong></td>
+            <td style="padding: 10px 0; text-align: right;">${bankDetails?.ifscCode || "N/A"}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #9aa3b5;"><strong>Verified Timestamp</strong></td>
+            <td style="padding: 10px 0; text-align: right;">${new Date().toLocaleString()}</td>
+          </tr>
+        </table>
+        <p style="margin-top: 20px; color: #7f8899; font-size: 12px;">You are now ready to log in and start trading.</p>
+        <div style="border-top: 1px solid rgba(226,189,47,0.1); margin-top: 20px; padding-top: 10px; font-size: 11px; color: #6f7889; text-align: center;">
+          © 2026 StockFlow Pro. All rights reserved.
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"StockFlow Pro" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: `Account & KYC Verification Receipt`,
+      html,
+    };
+
+    console.log(`[Email] Sending registration/KYC receipt email to ${to}`);
+    const { success } = await deliver(mailOptions, "REGISTRATION_RECEIPT");
+    return success;
+};

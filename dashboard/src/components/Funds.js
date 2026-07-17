@@ -12,6 +12,20 @@ const formatINR = (value) => {
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3002";
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 const Funds = () => {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
@@ -84,13 +98,83 @@ const Funds = () => {
 
       setCreatedOrderId(data.order_id);
       setDepositAmount(numericAmount);
-      setShowGatewaySimulator(true);
-      setLoading(false);
-      setStatusMessage("");
+      
+      if (data.order_id.startsWith("order_demo_")) {
+        setShowGatewaySimulator(true);
+        setLoading(false);
+        setStatusMessage("");
+      } else {
+        setStatusMessage("Opening secure payment gateway...");
+        const resLoaded = await loadRazorpayScript();
+        if (!resLoaded) {
+          throw new Error("Failed to load Razorpay SDK. Please check your connection.");
+        }
+        
+        const options = {
+          key: data.key_id,
+          amount: data.amount,
+          currency: data.currency,
+          name: "StockFlow Pro",
+          description: "Deposit Funds",
+          order_id: data.order_id,
+          handler: async function (response) {
+            await verifyRealPayment(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature, numericAmount);
+          },
+          theme: {
+            color: "#D4AF37",
+          },
+          modal: {
+            ondismiss: function () {
+              setLoading(false);
+              setStatusMessage("Payment cancelled.");
+              setStatusType("info");
+            }
+          }
+        };
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+        setLoading(false);
+        setStatusMessage("");
+      }
     } catch (err) {
       console.error("Top-up initialization error:", err);
       setStatusType("error");
       setStatusMessage(err.response?.data?.message || err.message || "Failed to initialize payment.");
+      setLoading(false);
+    }
+  };
+
+  const verifyRealPayment = async (orderId, paymentId, signature, depositAmt) => {
+    setLoading(true);
+    setStatusType("info");
+    setStatusMessage("Verifying payment...");
+    try {
+      const verifyRes = await axios.post(`${API_URL}/api/wallet/verify-payment`, {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature,
+        amount: depositAmt
+      }, { withCredentials: true });
+
+      if (verifyRes.data.success) {
+        setStatusType("success");
+        setStatusMessage(`Success! Added ${formatINR(depositAmt)} to your wallet.`);
+        setAmount("");
+        fetchWalletDetails();
+        setTimeout(() => {
+          setIsModalOpen(false);
+          setShowGatewaySimulator(false);
+          setCreatedOrderId("");
+          setStatusMessage("");
+        }, 2000);
+      } else {
+        setStatusType("error");
+        setStatusMessage(verifyRes.data.message || "Verification failed.");
+      }
+    } catch (err) {
+      setStatusType("error");
+      setStatusMessage(err.response?.data?.message || "Verification failed.");
+    } finally {
       setLoading(false);
     }
   };
