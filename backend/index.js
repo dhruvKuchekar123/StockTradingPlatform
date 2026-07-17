@@ -4,6 +4,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const helmet = require("helmet");
 const { createServer } = require("http");
 const { initPriceSocket } = require("./websocket/PriceSocket");
 const { startPoller } = require("./jobs/PricePoller");
@@ -29,6 +30,11 @@ const webhookRoute = require("./Routes/WebhookRoute");
 const { startGTTExpiryJob } = require("./jobs/GTTExpiryJob");
 
 const app = express();
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
 
 // FORCING NODEMON RESTART to reload .env keys
 require("dotenv").config();
@@ -67,17 +73,17 @@ app.use("/api/orders", orderRoute);
 app.use("/api/wallet", walletRoute);
 app.use("/api/webhooks", webhookRoute);
 
-app.get("/allHoldings", async (req, res) => {
-  let allHoldings = await HoldingsModel.find();
+const { userVerification } = require("./Middlewares/AuthMiddleware");
+
+app.get("/allHoldings", userVerification, async (req, res) => {
+  let allHoldings = await HoldingsModel.find({ userId: req.user.id });
   res.json(allHoldings);
 });
 
-app.get("/allPositions", async (req, res) => {
-  let allPositions = await PositionsModel.find();
+app.get("/allPositions", userVerification, async (req, res) => {
+  let allPositions = await PositionsModel.find({ userId: req.user.id });
   res.json(allPositions);
 });
-
-const { userVerification } = require("./Middlewares/AuthMiddleware");
 const MarketService = require("./util/MarketService");
 const UserModel = require("./model/UserModel");
 

@@ -64,7 +64,7 @@ module.exports.adminVerification = (req, res, next) => {
     if (err) return res.status(401).json({ status: false, message: "Token verification failed" });
     
     const user = await getCachedUser(data.id, false);
-    if (user) {
+    if (user && user.role === "admin") {
       req.user = user;
       next();
     } else {
@@ -82,8 +82,7 @@ module.exports.isAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ status: false, message: "Authentication required" });
   }
-  // Temporarily bypass for recording
-  if (false && req.user.role !== "admin") {
+  if (req.user.role !== "admin") {
     return res.status(403).json({ status: false, message: "Access denied. Admins only." });
   }
   next();

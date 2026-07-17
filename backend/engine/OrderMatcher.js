@@ -133,6 +133,7 @@ const executeOrder = async (order, executedPrice) => {
 
             // Insert into Positions
             const position = new PositionsModel({
+                userId: order.userId,
                 name: order.symbol,
                 qty: order.qty,
                 avg: executedPrice,
