@@ -287,14 +287,12 @@ module.exports.VerifyOTP = async (req, res) => {
     user.otpAttempts = 0;
     await user.save();
 
-    // Send registration & KYC receipt email after a 10-second delay
-    setTimeout(async () => {
-      try {
-        await sendRegistrationReceiptEmail(user.email, user.username, user.bankDetails);
-      } catch (err) {
-        console.error("[Email] Failed to send registration receipt email:", err.message);
-      }
-    }, 10000); // 10 seconds delay
+    // Send registration & KYC receipt email immediately to ensure delivery in serverless environments
+    try {
+      await sendRegistrationReceiptEmail(user.email, user.username, user.bankDetails);
+    } catch (err) {
+      console.error("[Email] Failed to send registration receipt email:", err.message);
+    }
 
     return res.json({ success: true, message: "Email verified successfully!" });
   } catch (error) {

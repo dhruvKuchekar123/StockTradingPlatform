@@ -167,12 +167,14 @@ const executeOrder = async (order, executedPrice) => {
         OrderEmitter.emit('order:executed', order);
         console.log(`[Matcher] Executed ${order.side} order ${order._id} for ${order.symbol} at ${executedPrice}`);
 
-        // Receipt email is fire-and-forget AFTER commit: it must never block the
-        // trade or the bell, and any failure is captured in the failedEmails queue
-        // by the email service itself (so no await, no rollback risk).
+        // Receipt email is awaited: in serverless environments, fire-and-forget
+        // promises run after response can be abruptly frozen/killed.
         const receipt = order.side === 'BUY' ? sendPaymentReceiptEmail : sendSellReceiptEmail;
-        receipt(user.email, order.symbol, order.qty, executedPrice)
-            .catch(err => console.error(`[Matcher] Receipt email dispatch error for order ${order._id}:`, err.message));
+        try {
+            await receipt(user.email, order.symbol, order.qty, executedPrice);
+        } catch (emailErr) {
+            console.error(`[Matcher] Receipt email dispatch error for order ${order._id}:`, emailErr.message);
+        }
 
     } catch (err) {
         await session.abortTransaction();
