@@ -38,6 +38,8 @@ const Funds = () => {
   const [createdOrderId, setCreatedOrderId] = useState("");
   const [depositAmount, setDepositAmount] = useState(0);
   const [showGatewaySimulator, setShowGatewaySimulator] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("REAL"); // "REAL" or "MOCK"
+
 
   const fetchWalletDetails = async () => {
     try {
@@ -89,7 +91,8 @@ const Funds = () => {
     try {
       // 1. Create order on backend
       const { data } = await axios.post(`${API_URL}/api/wallet/create-order`, {
-        amount: numericAmount
+        amount: numericAmount,
+        isMock: paymentMethod === "MOCK"
       }, { withCredentials: true });
 
       if (!data.success) {
@@ -251,6 +254,7 @@ const Funds = () => {
             onClick={() => {
               setIsModalOpen(true);
               setShowGatewaySimulator(false);
+              setPaymentMethod("REAL");
               setValidationError("");
               setStatusMessage("");
             }}
@@ -479,6 +483,40 @@ const Funds = () => {
                 </div>
               ) : (
                 <form onSubmit={handleAddFunds}>
+                  <div style={{ marginBottom: "20px" }}>
+                    <label style={{ fontSize: "12px", color: "var(--text-dim)", display: "block", marginBottom: "8px", fontWeight: 600 }}>
+                      Select Payment Method
+                    </label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => {
+                        setPaymentMethod(e.target.value);
+                        setValidationError("");
+                        setStatusMessage("");
+                      }}
+                      disabled={loading}
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        borderRadius: "10px",
+                        border: "1px solid var(--border)",
+                        backgroundColor: "rgba(255,255,255,0.03)",
+                        color: "#fff",
+                        fontSize: "14px",
+                        fontWeight: 650,
+                        outline: "none",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <option value="REAL" style={{ backgroundColor: "#11161F", color: "#fff" }}>
+                        Real Razorpay Gateway (UPI, Cards, Netbanking)
+                      </option>
+                      <option value="MOCK" style={{ backgroundColor: "#11161F", color: "#fff" }}>
+                        Demo Gateway Simulator (Mock Transaction)
+                      </option>
+                    </select>
+                  </div>
+
                   <div style={{ marginBottom: "20px" }}>
                     <label style={{ fontSize: "12px", color: "var(--text-dim)", display: "block", marginBottom: "8px", fontWeight: 600 }}>
                       Enter Amount (INR)

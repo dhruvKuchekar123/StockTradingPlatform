@@ -15,7 +15,7 @@ const getRazorpayInstance = () => {
 // 1. Create Razorpay order for top-up
 module.exports.createOrder = async (req, res) => {
     try {
-        const { amount } = req.body; // Amount in INR (Rupees)
+        const { amount, isMock } = req.body; // Amount in INR (Rupees)
         const userId = req.user.id;
 
         if (!amount || isNaN(amount)) {
@@ -45,16 +45,24 @@ module.exports.createOrder = async (req, res) => {
         };
 
         let rzpOrder;
-        try {
-            const razorpay = getRazorpayInstance();
-            rzpOrder = await razorpay.orders.create(options);
-        } catch (err) {
-            console.log("[Wallet Controller] Razorpay failed, generating mock order:", err.message);
+        if (isMock) {
             rzpOrder = {
                 id: `order_demo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                 amount: amountInPaise,
                 currency: "INR"
             };
+        } else {
+            try {
+                const razorpay = getRazorpayInstance();
+                rzpOrder = await razorpay.orders.create(options);
+            } catch (err) {
+                console.log("[Wallet Controller] Razorpay failed, generating mock order:", err.message);
+                rzpOrder = {
+                    id: `order_demo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                    amount: amountInPaise,
+                    currency: "INR"
+                };
+            }
         }
 
         // Create pending transaction in DB
