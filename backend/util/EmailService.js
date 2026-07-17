@@ -3,11 +3,14 @@ const FailedEmail = require("../model/FailedEmailModel");
 require("dotenv").config();
 
 const transporter = nodemailer.createTransport({
-  service: "gmail", // You can change this
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  connectionTimeout: 2000, // 2 seconds
+  greetingTimeout: 2000,
+  socketTimeout: 3000,
 });
 
 /**
