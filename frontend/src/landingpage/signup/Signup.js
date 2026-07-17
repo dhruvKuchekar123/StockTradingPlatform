@@ -196,7 +196,10 @@ const Signup = () => {
         ) : (
           <>
             <p className="auth-copy">Open your trading account and connect KYC details for dashboard access.</p>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} autoComplete="off">
+              {/* Dummy inputs to intercept and satisfy browser autofill requests */}
+              <input type="text" name="prevent_autofill_email" style={{ display: 'none' }} autoComplete="off" />
+              <input type="password" name="prevent_autofill_password" style={{ display: 'none' }} autoComplete="off" />
               <div className="auth-field">
                 <label>Email address</label>
                 <input

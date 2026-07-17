@@ -109,6 +109,10 @@ const Login = () => {
         </div>
         <p className="auth-copy">Login to continue to your live trading dashboard, watchlists, orders, and portfolio.</p>
         <form onSubmit={handleSubmit} autoComplete="off">
+          {/* Dummy inputs to intercept and satisfy browser autofill requests */}
+          <input type="text" name="prevent_autofill_email" style={{ display: 'none' }} autoComplete="off" />
+          <input type="password" name="prevent_autofill_password" style={{ display: 'none' }} autoComplete="off" />
+
           <div className="auth-field">
             <label>Email address</label>
             <input
@@ -117,7 +121,7 @@ const Login = () => {
               value={email}
               placeholder="Enter your email"
               onChange={handleOnChange}
-              autoComplete="username"
+              autoComplete="new-email"
               required
             />
           </div>
@@ -130,7 +134,7 @@ const Login = () => {
                 value={password}
                 placeholder="Enter your password"
                 onChange={handleOnChange}
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
               />
               <button
